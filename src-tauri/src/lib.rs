@@ -233,6 +233,21 @@ fn reload_profile(profile: Profile) -> Result<String, String> {
     Ok("Profile reloaded".to_string())
 }
 
+/// Temporarily unregister the global capture hotkey (while the UI captures a
+/// new key assignment, so the old hotkey cannot fire mid-assignment).
+#[tauri::command]
+fn suspend_hotkey() -> Result<(), String> {
+    input_engine::engine::suspend_hotkey();
+    Ok(())
+}
+
+/// Re-register the global capture hotkey from the current profile.
+#[tauri::command]
+fn resume_hotkey() -> Result<(), String> {
+    input_engine::engine::resume_hotkey();
+    Ok(())
+}
+
 #[tauri::command]
 fn is_engine_running() -> bool {
     input_engine::engine::is_running()
@@ -305,6 +320,8 @@ pub fn run() {
             center_cursor,
             show_cursor,
             toggle_capture,
+            suspend_hotkey,
+            resume_hotkey,
             save_profile,
             load_profile,
             list_profiles,

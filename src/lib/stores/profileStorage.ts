@@ -20,6 +20,9 @@ function normalizeStick(s: StickConfig, smoothingDefault: number): StickConfig {
 }
 
 export async function loadProfile(name: string): Promise<Profile> {
+  // Suspend the capture hotkey while swapping profiles, then push the loaded
+  // profile to the engine — this re-registers the hotkey with the new key.
+  await invoke("suspend_hotkey").catch(() => {});
   const data = await invoke<Profile>("load_profile", { name });
   const normalized: Profile = {
     ...data,
@@ -28,6 +31,7 @@ export async function loadProfile(name: string): Promise<Profile> {
   };
   profile.set(normalized);
   activeProfileName.set(name);
+  await invoke("reload_profile", { profile: normalized }).catch(() => {});
   return normalized;
 }
 

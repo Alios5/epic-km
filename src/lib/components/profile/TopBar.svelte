@@ -108,6 +108,9 @@
   }
 
   function startAssignKey() {
+    // Suspend the global hotkey while assigning: pressing the current toggle
+    // key must not toggle capture in the middle of the assignment.
+    invoke("suspend_hotkey").catch(() => {});
     assigningKey = true;
   }
 
@@ -115,11 +118,13 @@
     if (assigningKey) {
       e.preventDefault();
       e.stopPropagation();
-      profile.update((p) => ({ ...p, captureToggleKey: e.code }));
-      markDirty();
       assigningKey = false;
-      // Push the new profile to the engine so the hotkey is re-registered
-      // immediately with the new key (no restart needed)
+      if (e.code !== "Escape") {
+        profile.update((p) => ({ ...p, captureToggleKey: e.code }));
+        markDirty();
+      }
+      // Push the profile to the engine so the hotkey is re-registered
+      // immediately — with the new key, or the old one if cancelled (Escape).
       invoke("reload_profile", { profile: get(profile) }).catch(() => {});
       return;
     }

@@ -141,6 +141,20 @@ pub fn reload_profile(profile: Profile) -> Result<(), String> {
     }
 }
 
+/// Temporarily unregister the global capture hotkey (e.g. while the user is
+/// assigning a new key in the UI, so pressing the old key does not toggle
+/// capture mid-assignment).
+pub fn suspend_hotkey() {
+    #[cfg(target_os = "windows")]
+    win_capture::post_hotkey_off_message();
+}
+
+/// Re-register the global capture hotkey from the current profile.
+pub fn resume_hotkey() {
+    #[cfg(target_os = "windows")]
+    win_capture::post_reregister_message();
+}
+
 /// Check if the engine is running.
 pub fn is_running() -> bool {
     unsafe {
@@ -377,6 +391,7 @@ mod win_capture {
     // Custom thread messages handled by the capture thread's message loop
     const WM_APP_TOGGLE: u32 = WM_APP + 1;
     const WM_APP_REREGISTER: u32 = WM_APP + 2;
+    const WM_APP_HOTKEY_OFF: u32 = WM_APP + 3;
 
     // Global pointer to the shared state, set before the capture thread starts.
     static mut SHARED_STATE: Option<Arc<EngineState>> = None;
@@ -427,6 +442,15 @@ mod win_capture {
         }
     }
 
+    /// Ask the capture thread to unregister the hotkey (suspend).
+    pub fn post_hotkey_off_message() {
+        unsafe {
+            if THREAD_ID != 0 {
+                let _ = PostThreadMessageW(THREAD_ID, WM_APP_HOTKEY_OFF, WPARAM(0), LPARAM(0));
+            }
+        }
+    }
+
     /// Toggle capture mode — shared by WM_HOTKEY and WM_APP_TOGGLE.
     fn toggle_capture_state() {
         unsafe {
@@ -443,6 +467,15 @@ mod win_capture {
                 }
                 log(if new_active { "Capture mode ACTIVATED" } else { "Capture mode DEACTIVATED" });
             }
+        }
+    }
+
+    /// Unregister the global hotkey (suspend) — used while the UI captures a
+    /// new key assignment so the old hotkey cannot fire mid-assignment.
+    fn unregister_hotkey(hwnd: HWND) {
+        unsafe {
+            let _ = UnregisterHotKey(Some(hwnd), HOTKEY_ID);
+            log("Global hotkey temporarily unregistered");
         }
     }
 
@@ -871,6 +904,10 @@ mod win_capture {
                 }
                 if msg.message == WM_APP_REREGISTER {
                     reregister_hotkey(hwnd);
+                    continue;
+                }
+                if msg.message == WM_APP_HOTKEY_OFF {
+                    unregister_hotkey(hwnd);
                     continue;
                 }
                 let _ = TranslateMessage(&msg);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { invoke } from "@tauri-apps/api/core";
   import { layoutMap, labelForCode } from "$lib/keyLabels";
   import { t, locale } from "$lib/stores/i18n";
 
@@ -12,6 +13,9 @@
   let listening = $state(false);
 
   function startListening() {
+    // Suspend the global capture hotkey while listening: pressing the current
+    // toggle key must not toggle capture in the middle of the assignment.
+    invoke("suspend_hotkey").catch(() => {});
     listening = true;
   }
 
@@ -20,10 +24,18 @@
     e.preventDefault();
     e.stopPropagation();
     listening = false;
-    onchange(e.code);
+    if (e.code !== "Escape") {
+      onchange(e.code);
+    }
+    // The parent's onchange pushes the new profile to the engine (which
+    // re-registers the hotkey); resume covers cancel/Escape paths.
+    invoke("resume_hotkey").catch(() => {});
   }
 
   function handleBlur() {
+    if (listening) {
+      invoke("resume_hotkey").catch(() => {});
+    }
     listening = false;
   }
 </script>
