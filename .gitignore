@@ -9,6 +9,9 @@ node_modules
 # Rust build artifacts (recompiled by cargo on `tauri dev`)
 target/
 
+# Local release packages (zips, installers)
+/release/
+
 # Env files
 .env
 .env.*
