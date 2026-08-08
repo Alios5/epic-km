@@ -1,0 +1,182 @@
+import { writable } from "svelte/store";
+
+export type StickCurve = "linear" | "exponential";
+
+export const hasUnsavedChanges = writable<boolean>(false);
+
+export function markDirty() {
+  hasUnsavedChanges.set(true);
+}
+
+export function markClean() {
+  hasUnsavedChanges.set(false);
+}
+
+export interface KeyboardMapping {
+  id: string;
+  key: string;
+  button: string;
+}
+
+export type StickDirection = "up" | "down" | "left" | "right";
+
+export interface KeyboardStickMapping {
+  id: string;
+  key: string;
+  direction: StickDirection;
+}
+
+export interface StickConfig {
+  sensitivity: number;
+  /** Extra per-axis multipliers on top of the global sensitivity */
+  sensitivityX: number;
+  sensitivityY: number;
+  curve: StickCurve;
+  deadzone: number;
+  /** Output smoothing amount: 0 = off, up to 0.95 */
+  smoothing: number;
+  invertY: boolean;
+  invertX: boolean;
+  refreshInterval: number;
+}
+
+export interface Profile {
+  keyboardToButton: KeyboardMapping[];
+  keyboardToLeftStick: KeyboardStickMapping[];
+  leftStick: StickConfig;
+  rightStick: StickConfig;
+  triggerThreshold: number;
+  captureToggleKey: string;
+}
+
+export const GAMEPAD_BUTTONS = [
+  "A",
+  "B",
+  "X",
+  "Y",
+  "DPadUp",
+  "DPadDown",
+  "DPadLeft",
+  "DPadRight",
+  "LB",
+  "RB",
+  "LT",
+  "RT",
+  "Start",
+  "Back",
+  "LeftThumb",
+  "RightThumb",
+] as const;
+
+// Buttons that can be mapped to a keyboard key
+export const MAPPABLE_BUTTONS = [
+  "A",
+  "B",
+  "X",
+  "Y",
+  "DPadUp",
+  "DPadDown",
+  "DPadLeft",
+  "DPadRight",
+  "LB",
+  "RB",
+  "LT",
+  "RT",
+  "Start",
+  "Back",
+  "LeftThumb",
+  "RightThumb",
+] as const;
+
+export const PROFILES = ["Défaut", "FPS", "Course"] as readonly string[];
+
+export const activeProfileName = writable<string>("Défaut");
+
+export const profile = writable<Profile>({
+  keyboardToButton: [
+    { id: "1", key: "Space", button: "A" },
+    { id: "2", key: "KeyE", button: "B" },
+    { id: "3", key: "KeyQ", button: "X" },
+    { id: "4", key: "ShiftLeft", button: "RB" },
+  ],
+  keyboardToLeftStick: [
+    { id: "ls1", key: "KeyW", direction: "up" },
+    { id: "ls2", key: "KeyS", direction: "down" },
+    { id: "ls3", key: "KeyA", direction: "left" },
+    { id: "ls4", key: "KeyD", direction: "right" },
+  ],
+  leftStick: {
+    sensitivity: 1.0,
+    sensitivityX: 1.0,
+    sensitivityY: 1.0,
+    curve: "linear",
+    deadzone: 0.1,
+    smoothing: 0.0,
+    invertY: false,
+    invertX: false,
+    refreshInterval: 60,
+  },
+  rightStick: {
+    sensitivity: 1.5,
+    sensitivityX: 1.0,
+    sensitivityY: 1.0,
+    curve: "linear",
+    deadzone: 0.02,
+    smoothing: 0.3,
+    invertY: false,
+    invertX: false,
+    refreshInterval: 60,
+  },
+  triggerThreshold: 0.5,
+  captureToggleKey: "F1",
+});
+
+// Helper: find the key assigned to a button (or empty)
+export function getKeyForButton(
+  mappings: KeyboardMapping[],
+  button: string,
+): string {
+  const found = mappings.find((m) => m.button === button);
+  return found ? found.key : "";
+}
+
+// Helper: assign or update a key for a button
+export function setKeyForButton(button: string, key: string) {
+  markDirty();
+  profile.update((p) => {
+    const existing = p.keyboardToButton.find((m) => m.button === button);
+    if (existing) {
+      return {
+        ...p,
+        keyboardToButton: p.keyboardToButton.map((m) =>
+          m.button === button ? { ...m, key } : m,
+        ),
+      };
+    }
+    return {
+      ...p,
+      keyboardToButton: [
+        ...p.keyboardToButton,
+        { id: crypto.randomUUID(), key, button },
+      ],
+    };
+  });
+}
+
+// Helper: remove a mapping by button name
+export function removeKeyForButton(button: string) {
+  markDirty();
+  profile.update((p) => ({
+    ...p,
+    keyboardToButton: p.keyboardToButton.filter((m) => m.button !== button),
+  }));
+}
+
+// Helper: remove a mapping by id
+export function removeMappingById(id: string) {
+  markDirty();
+  profile.update((p) => ({
+    ...p,
+    keyboardToButton: p.keyboardToButton.filter((m) => m.id !== id),
+  }));
+}
