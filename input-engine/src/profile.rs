@@ -97,7 +97,7 @@ impl Default for Profile {
                 smoothing: 0.3,
                 invert_y: false,
                 invert_x: false,
-                refresh_interval: 60,
+                refresh_interval: 240,
             },
             trigger_threshold: 0.5,
             capture_toggle_key: "F1".to_string(),

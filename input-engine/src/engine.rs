@@ -251,23 +251,54 @@ fn emission_thread(state: Arc<EngineState>) {
             return;
         }
 
-        // Low-latency setup: 1 ms timer resolution so the polling loop can
-        // actually reach 1000 Hz, and a high-priority thread to minimise
-        // scheduling jitter.
+        // Low-latency setup: 1 ms timer resolution, a high-priority thread to
+        // minimise scheduling jitter, and a HIGH-RESOLUTION waitable timer
+        // (Win10 1803+) for sub-ms pacing without busy-spinning.
         unsafe {
             timeBeginPeriod(1);
             let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
         }
 
+        use windows::Win32::System::Performance::{QueryPerformanceCounter, QueryPerformanceFrequency};
+        use windows::Win32::System::Threading::{
+            CreateWaitableTimerExW, SetWaitableTimerEx, WaitForSingleObject,
+            CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS,
+        };
+
+        /// Current QPC time in 100 ns units (overflow-safe).
+        fn qpc_100ns(freq: i64) -> i64 {
+            unsafe {
+                let mut c = 0i64;
+                let _ = QueryPerformanceCounter(&mut c);
+                (c / freq) * 10_000_000 + (c % freq) * 10_000_000 / freq
+            }
+        }
+
+        let qpc_freq = unsafe {
+            let mut f = 0i64;
+            let _ = QueryPerformanceFrequency(&mut f);
+            f
+        };
+        let hi_res_timer = unsafe {
+            CreateWaitableTimerExW(
+                None,
+                windows::core::PCWSTR::null(),
+                CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+                TIMER_ALL_ACCESS.0,
+            )
+            .ok()
+        };
+        let mut next_tick = qpc_100ns(qpc_freq);
+
         elog(&state, "Emission thread started — ViGEmBus connected");
 
         while state.running.load(Ordering::SeqCst) {
-            // Read polling rate from profile
+            // Read polling rate from profile (period in 100 ns units)
             let hz = {
                 let p = state.profile.lock();
                 p.right_stick.refresh_interval.max(1)
             };
-            let interval_us = 1_000_000 / hz as u64;
+            let period_100ns = 10_000_000i64 / hz as i64;
 
             // Map input — the whole gamepad report is gated on capture mode.
             // When capture is OFF (mouse2joystick-style idle state), the virtual
@@ -330,9 +361,37 @@ fn emission_thread(state: Arc<EngineState>) {
                 eprintln!("[input-engine] ViGEmBus update error: {}", e);
             }
 
-            thread::sleep(Duration::from_micros(interval_us));
+            // Absolute-deadline pacing (no drift): wait until the next tick.
+            next_tick += period_100ns;
+            if let Some(timer) = hi_res_timer {
+                let wait = next_tick - qpc_100ns(qpc_freq);
+                if wait > 0 {
+                    let due = -wait; // negative = relative time, 100 ns units
+                    unsafe {
+                        let _ = SetWaitableTimerEx(timer, &due, 0, None, None, None, 0);
+                        let _ = WaitForSingleObject(timer, 0xFFFFFFFF); // INFINITE
+                    }
+                }
+            } else {
+                // Fallback: sleep the bulk, spin the last ~1 ms.
+                loop {
+                    let remaining = next_tick - qpc_100ns(qpc_freq);
+                    if remaining <= 0 { break; }
+                    if remaining > 15_000 {
+                        thread::sleep(Duration::from_micros(((remaining - 10_000) / 10).max(1) as u64));
+                    } else {
+                        std::hint::spin_loop();
+                    }
+                }
+            }
+            // Resync after a system stall so we don't emit catch-up bursts.
+            let now = qpc_100ns(qpc_freq);
+            if now - next_tick > period_100ns { next_tick = now; }
         }
 
+        if let Some(t) = hi_res_timer {
+            unsafe { let _ = windows::Win32::Foundation::CloseHandle(t); };
+        }
         unsafe { timeEndPeriod(1); }
         let _ = target.unplug();
         elog(&state, "Emission thread stopped");

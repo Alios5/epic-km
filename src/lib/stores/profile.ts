@@ -125,7 +125,7 @@ export const profile = writable<Profile>({
     smoothing: 0.3,
     invertY: false,
     invertX: false,
-    refreshInterval: 60,
+    refreshInterval: 240,
   },
   triggerThreshold: 0.5,
   captureToggleKey: "F1",
