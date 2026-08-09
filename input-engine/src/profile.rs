@@ -37,6 +37,11 @@ fn default_axis_sensitivity() -> f64 {
     1.0
 }
 
+/// Cursor hidden during capture by default.
+fn default_hide_cursor() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StickConfig {
@@ -70,6 +75,10 @@ pub struct Profile {
     pub right_stick: StickConfig,
     pub trigger_threshold: f64,
     pub capture_toggle_key: String,
+    /// Hide the OS cursor while capture mode is active.
+    /// serde default keeps older profile files valid.
+    #[serde(default = "default_hide_cursor")]
+    pub hide_cursor: bool,
 }
 
 impl Default for Profile {
@@ -101,6 +110,7 @@ impl Default for Profile {
             },
             trigger_threshold: 0.5,
             capture_toggle_key: "F1".to_string(),
+            hide_cursor: true,
         }
     }
 }

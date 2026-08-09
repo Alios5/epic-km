@@ -3,8 +3,8 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
-  import { activeProfileName, profile, markDirty } from "$lib/stores/profile";
-  import { listProfiles, loadProfile } from "$lib/stores/profileStorage";
+  import { activeProfileName, profile, markDirty, markClean, getDefaultProfile } from "$lib/stores/profile";
+  import { listProfiles, loadProfile, deleteProfile } from "$lib/stores/profileStorage";
   import { captureModeActive } from "$lib/stores/app";
   import DownloadIcon from "@lucide/svelte/icons/download";
   import FolderIcon from "@lucide/svelte/icons/folder-open";
@@ -29,6 +29,9 @@
   let assigningKey = $state(false);
   let savedProfiles = $state<string[]>([]);
   let unlistenFn: (() => void) | null = null;
+  let showDeleteDialog = $state(false);
+  let deleteStatus = $state<"idle" | "deleting" | "success" | "error">("idle");
+  let deleteMessage = $state("");
 
   onMount(async () => {
     try {
@@ -107,6 +110,36 @@
     }
   }
 
+  async function handleDeleteProfile() {
+    const name = profileName.trim();
+    if (!name) return;
+    deleteStatus = "deleting";
+    try {
+      await deleteProfile(name);
+      // Reset to default profile
+      const def = getDefaultProfile();
+      profile.set(def);
+      activeProfileName.set($t("editor.defaultName"));
+      profileName = $t("editor.defaultName");
+      markClean();
+      // Reload engine with default profile
+      try {
+        await invoke("reload_profile", { profile: def });
+      } catch {
+        // Engine not running — ignore
+      }
+      // Refresh saved profiles list
+      savedProfiles = await listProfiles();
+      // Close dialog immediately
+      showDeleteDialog = false;
+      deleteStatus = "idle";
+      deleteMessage = "";
+    } catch (e) {
+      deleteStatus = "error";
+      deleteMessage = $t("delete.error", { error: String(e) });
+    }
+  }
+
   function startAssignKey() {
     // Suspend the global hotkey while assigning: pressing the current toggle
     // key must not toggle capture in the middle of the assignment.
@@ -115,6 +148,10 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (showDeleteDialog && e.code === "Escape" && deleteStatus !== "deleting") {
+      showDeleteDialog = false;
+      return;
+    }
     if (assigningKey) {
       e.preventDefault();
       e.stopPropagation();
@@ -198,7 +235,7 @@
     <Button variant="ghost" size="sm" class="h-8 w-8 p-0" aria-label={$t("common.openFile")} onclick={handleOpenProfile}>
       <FolderIcon class="size-4" />
     </Button>
-    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" aria-label={$t("common.delete")}>
+    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" aria-label={$t("common.delete")} title={$t("common.delete")} onclick={() => showDeleteDialog = true}>
       <TrashIcon class="size-4 text-destructive" />
     </Button>
     <Button variant="default" size="sm" class="h-8" onclick={onSave}>
@@ -207,3 +244,27 @@
     </Button>
   </div>
 </header>
+
+{#if showDeleteDialog}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div role="dialog" aria-modal="true" aria-label={$t("delete.title")} class="rounded-lg border border-border bg-card p-6 shadow-xl max-w-sm w-full mx-4">
+      <h2 class="text-lg font-semibold mb-2">{$t("delete.title")}</h2>
+      <p class="text-sm text-muted-foreground mb-6">
+        {$t("delete.message", { name: profileName.trim() || $t("editor.defaultName") })}
+      </p>
+      {#if deleteStatus === "error"}
+        <div class="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {deleteMessage}
+        </div>
+      {/if}
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" size="sm" onclick={() => showDeleteDialog = false} disabled={deleteStatus === "deleting"}>
+          {$t("common.cancel")}
+        </Button>
+        <Button variant="destructive" size="sm" onclick={handleDeleteProfile} disabled={deleteStatus === "deleting"}>
+          {deleteStatus === "deleting" ? "…" : $t("common.confirm")}
+        </Button>
+      </div>
+    </div>
+  </div>
+{/if}

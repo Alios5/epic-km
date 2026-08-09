@@ -40,6 +40,7 @@ const fr = {
   "common.openFile": "Ouvrir un fichier",
   "common.close": "Fermer",
   "common.cancel": "Annuler",
+  "common.confirm": "Confirmer",
   // Window / close confirmation
   "win.minimize": "Réduire",
   "win.maximize": "Agrandir",
@@ -52,6 +53,7 @@ const fr = {
   // Bottom bar
   "bottombar.triggerThreshold": "Seuil de déclenchement",
   "bottombar.captureKey": "Touche capture",
+  "bottombar.hideCursor": "Masquer le curseur",
   // Side panels
   "panel.leftTriggers": "Gâchettes gauche",
   "panel.rightTriggers": "Gâchettes droite",
@@ -108,6 +110,11 @@ const fr = {
   "stick.invertX": "Inverser axe X",
   // Gamepad diagram
   "diagram.hint": "Cliquez sur un élément de la manette pour lui assigner une touche ou un clic",
+  // Delete profile confirmation
+  "delete.title": "Supprimer le profil",
+  "delete.message": "Voulez-vous vraiment supprimer le profil « {name} » ?",
+  "delete.success": "Profil « {name} » supprimé",
+  "delete.error": "Échec de la suppression : {error}",
 } as const;
 
 export type MessageKey = keyof typeof fr;
@@ -145,6 +152,7 @@ const en: Record<MessageKey, string> = {
   "common.openFile": "Open file",
   "common.close": "Close",
   "common.cancel": "Cancel",
+  "common.confirm": "Confirm",
   "win.minimize": "Minimize",
   "win.maximize": "Maximize",
   "close.unsavedTitle": "Unsaved changes",
@@ -155,6 +163,7 @@ const en: Record<MessageKey, string> = {
   "close.confirmMsg": "Are you sure you want to close Epic KM?",
   "bottombar.triggerThreshold": "Trigger threshold",
   "bottombar.captureKey": "Capture key",
+  "bottombar.hideCursor": "Hide cursor",
   "panel.leftTriggers": "Left triggers",
   "panel.rightTriggers": "Right triggers",
   "panel.faceButtons": "A/B/X/Y buttons",
@@ -204,6 +213,10 @@ const en: Record<MessageKey, string> = {
   "stick.invertY": "Invert Y axis",
   "stick.invertX": "Invert X axis",
   "diagram.hint": "Click a controller element to assign a key or mouse click",
+  "delete.title": "Delete profile",
+  "delete.message": "Are you sure you want to delete profile \"{name}\"?",
+  "delete.success": "Profile \"{name}\" deleted",
+  "delete.error": "Delete failed: {error}",
 };
 
 const messages: Record<Locale, Record<MessageKey, string>> = { fr, en };

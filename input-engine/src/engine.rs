@@ -592,8 +592,14 @@ mod win_capture {
     /// Activate capture mode: hide cursor, clip cursor, install keyboard hook.
     pub fn activate_capture_mode() {
         unsafe {
-            // Hide cursor
-            while ShowCursor(false) >= 0 {}
+            // Hide cursor (unless disabled in the profile)
+            let hide_cursor = SHARED_STATE
+                .as_ref()
+                .map(|s| s.profile.lock().hide_cursor)
+                .unwrap_or(true);
+            if hide_cursor {
+                while ShowCursor(false) >= 0 {}
+            }
 
             // Clip cursor to center point (1x1 pixel rect)
             let cx = GetSystemMetrics(SM_CXSCREEN);

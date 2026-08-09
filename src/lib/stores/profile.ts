@@ -47,6 +47,8 @@ export interface Profile {
   rightStick: StickConfig;
   triggerThreshold: number;
   captureToggleKey: string;
+  /** Hide the OS cursor while capture mode is active */
+  hideCursor: boolean;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -92,44 +94,53 @@ export const PROFILES = ["Défaut", "FPS", "Course"] as readonly string[];
 
 export const activeProfileName = writable<string>("Défaut");
 
-export const profile = writable<Profile>({
-  keyboardToButton: [
-    { id: "1", key: "Space", button: "A" },
-    { id: "2", key: "KeyE", button: "B" },
-    { id: "3", key: "KeyQ", button: "X" },
-    { id: "4", key: "ShiftLeft", button: "RB" },
-  ],
-  keyboardToLeftStick: [
-    { id: "ls1", key: "KeyW", direction: "up" },
-    { id: "ls2", key: "KeyS", direction: "down" },
-    { id: "ls3", key: "KeyA", direction: "left" },
-    { id: "ls4", key: "KeyD", direction: "right" },
-  ],
-  leftStick: {
-    sensitivity: 1.0,
-    sensitivityX: 1.0,
-    sensitivityY: 1.0,
-    curve: "linear",
-    deadzone: 0.1,
-    smoothing: 0.0,
-    invertY: false,
-    invertX: false,
-    refreshInterval: 60,
-  },
-  rightStick: {
-    sensitivity: 1.5,
-    sensitivityX: 1.0,
-    sensitivityY: 1.0,
-    curve: "linear",
-    deadzone: 0.02,
-    smoothing: 0.3,
-    invertY: false,
-    invertX: false,
-    refreshInterval: 240,
-  },
-  triggerThreshold: 0.5,
-  captureToggleKey: "F1",
-});
+function defaultProfile(): Profile {
+  return {
+    keyboardToButton: [
+      { id: "1", key: "Space", button: "A" },
+      { id: "2", key: "KeyE", button: "B" },
+      { id: "3", key: "KeyQ", button: "X" },
+      { id: "4", key: "ShiftLeft", button: "RB" },
+    ],
+    keyboardToLeftStick: [
+      { id: "ls1", key: "KeyW", direction: "up" },
+      { id: "ls2", key: "KeyS", direction: "down" },
+      { id: "ls3", key: "KeyA", direction: "left" },
+      { id: "ls4", key: "KeyD", direction: "right" },
+    ],
+    leftStick: {
+      sensitivity: 1.0,
+      sensitivityX: 1.0,
+      sensitivityY: 1.0,
+      curve: "linear",
+      deadzone: 0.1,
+      smoothing: 0.0,
+      invertY: false,
+      invertX: false,
+      refreshInterval: 60,
+    },
+    rightStick: {
+      sensitivity: 1.5,
+      sensitivityX: 1.0,
+      sensitivityY: 1.0,
+      curve: "linear",
+      deadzone: 0.02,
+      smoothing: 0.3,
+      invertY: false,
+      invertX: false,
+      refreshInterval: 240,
+    },
+    triggerThreshold: 0.5,
+    captureToggleKey: "F1",
+    hideCursor: true,
+  };
+}
+
+export function getDefaultProfile(): Profile {
+  return defaultProfile();
+}
+
+export const profile = writable<Profile>(defaultProfile());
 
 // Helper: find the key assigned to a button (or empty)
 export function getKeyForButton(

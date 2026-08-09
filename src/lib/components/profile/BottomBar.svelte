@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Slider } from "$lib/components/ui/slider/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
   import { profile, markDirty } from "$lib/stores/profile";
   import KeyCaptureInput from "$lib/components/KeyCaptureInput.svelte";
   import { t } from "$lib/stores/i18n";
@@ -35,6 +36,12 @@
     profile.update((p) => ({ ...p, captureToggleKey: key }));
     pushToEngine();
   }
+
+  function updateHideCursor(v: boolean) {
+    markDirty();
+    profile.update((p) => ({ ...p, hideCursor: v }));
+    pushToEngine();
+  }
 </script>
 
 <footer class="flex items-center gap-4 px-4 py-2.5 border-t border-border bg-card">
@@ -60,6 +67,22 @@
       value={$profile.captureToggleKey}
       onchange={updateToggleKey}
     />
+  </div>
+
+  <div class="h-5 w-px bg-border"></div>
+
+  <div class="flex items-center gap-2">
+    <Checkbox
+      id="hide-cursor"
+      checked={$profile.hideCursor}
+      onCheckedChange={(v) => updateHideCursor(v === true)}
+      class="size-4"
+    />
+    <label
+      for="hide-cursor"
+      class="text-xs font-medium whitespace-nowrap cursor-pointer select-none"
+      >{$t("bottombar.hideCursor")}</label
+    >
   </div>
 
   <div class="ml-auto">

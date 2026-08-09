@@ -26,6 +26,7 @@ export async function loadProfile(name: string): Promise<Profile> {
   const data = await invoke<Profile>("load_profile", { name });
   const normalized: Profile = {
     ...data,
+    hideCursor: data.hideCursor ?? true,
     leftStick: normalizeStick(data.leftStick, 0.0),
     rightStick: normalizeStick(data.rightStick, 0.3),
   };
