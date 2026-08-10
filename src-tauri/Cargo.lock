@@ -883,7 +883,7 @@ dependencies = [
 
 [[package]]
 name = "epic-mouse"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "input-engine",
  "serde",

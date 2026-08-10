@@ -1,8 +1,8 @@
 [package]
 name = "epic-mouse"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.1.2"
+description = "Emulate an Xbox 360 controller from mouse and keyboard"
+authors = ["Alios5"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
