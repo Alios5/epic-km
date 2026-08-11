@@ -39,29 +39,30 @@
     { button: "DPadRight", x: 101, y: 89, w: 12, h: 13 },
   ];
 
-  // DualShock 4 art: /ds4.svg (1024 x 1024 source cropped to viewBox
-  // "0 160 1024 720"). Zone coords below are already in cropped space
-  // (art_y - 160). Face buttons keep the internal Xbox names:
-  // Triangle=Y, Circle=B, Cross=A, Square=X; Share=Back, Options=Start.
-  const DS4_VW = 1024;
-  const DS4_VH = 720;
+  // DualShock 4 art: /ds4.svg (native viewBox 268 x 174). L2/R2 are not
+  // visible on this front view, so they get labelled tabs at the top
+  // corners; the protruding top tabs are L1/R1. Face buttons keep the
+  // internal Xbox names: Triangle=Y, Circle=B, Cross=A, Square=X;
+  // Share=Back, Options=Start.
+  const DS4_VW = 268;
+  const DS4_VH = 174;
   const ds4Zones: Zone[] = [
-    { button: "LT", x: 24, y: 4, w: 136, h: 54, zoneLabel: "LT" },
-    { button: "RT", x: 864, y: 4, w: 136, h: 54, zoneLabel: "RT" },
-    { button: "LB", x: 288, y: 90, w: 44, h: 72 },
-    { button: "RB", x: 692, y: 90, w: 44, h: 72 },
-    { button: "Back", x: 370, y: 62, w: 40, h: 40, circle: true },
-    { button: "Start", x: 614, y: 62, w: 40, h: 40, circle: true },
-    { button: "Y", x: 799, y: 102, w: 68, h: 68, circle: true },
-    { button: "X", x: 727, y: 174, w: 68, h: 68, circle: true },
-    { button: "B", x: 871, y: 174, w: 68, h: 68, circle: true },
-    { button: "A", x: 799, y: 246, w: 68, h: 68, circle: true },
-    { button: "LeftThumb", x: 283, y: 300, w: 130, h: 130, circle: true },
-    { button: "RightThumb", x: 609, y: 300, w: 130, h: 130, circle: true },
-    { button: "DPadUp", x: 166, y: 125, w: 55, h: 70 },
-    { button: "DPadDown", x: 166, y: 228, w: 55, h: 70 },
-    { button: "DPadLeft", x: 106, y: 182, w: 70, h: 55 },
-    { button: "DPadRight", x: 208, y: 182, w: 70, h: 55 },
+    { button: "LT", x: 2, y: 1, w: 26, h: 12, zoneLabel: "LT" },
+    { button: "RT", x: 240, y: 1, w: 26, h: 12, zoneLabel: "RT" },
+    { button: "LB", x: 31, y: 0, w: 41, h: 14 },
+    { button: "RB", x: 196, y: 0, w: 41, h: 14 },
+    { button: "Back", x: 75, y: 19, w: 12, h: 19 },
+    { button: "Start", x: 181, y: 19, w: 12, h: 19 },
+    { button: "Y", x: 209.5, y: 22.5, w: 18, h: 18, circle: true },
+    { button: "X", x: 191, y: 41.5, w: 18, h: 18, circle: true },
+    { button: "B", x: 228.5, y: 41.5, w: 18, h: 18, circle: true },
+    { button: "A", x: 209.5, y: 60.5, w: 18, h: 18, circle: true },
+    { button: "LeftThumb", x: 74, y: 75.5, w: 35, h: 35, circle: true },
+    { button: "RightThumb", x: 160, y: 75.5, w: 35, h: 35, circle: true },
+    { button: "DPadUp", x: 42.5, y: 29, w: 14.5, h: 15.5 },
+    { button: "DPadDown", x: 42.5, y: 58.7, w: 14.5, h: 15.5 },
+    { button: "DPadLeft", x: 27, y: 44.5, w: 15.5, h: 14.2 },
+    { button: "DPadRight", x: 57, y: 44.5, w: 15.5, h: 14.2 },
   ];
 
   let isDs4 = $derived($profile.controllerType === "ds4");
