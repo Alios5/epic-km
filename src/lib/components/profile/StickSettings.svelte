@@ -2,7 +2,7 @@
   import * as Select from "$lib/components/ui/select/index.js";
   import { Slider } from "$lib/components/ui/slider/index.js";
   import { Checkbox } from "$lib/components/ui/checkbox/index.js";
-  import { profile, markDirty, type StickConfig, type StickCurve, type AxisInputMode } from "$lib/stores/profile";
+  import { profile, markDirty, type StickConfig, type StickCurve } from "$lib/stores/profile";
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
   import { t } from "$lib/stores/i18n";
@@ -47,61 +47,9 @@
   }
   function updateInvertY(checked: boolean) { update({ invertY: checked }); }
   function updateInvertX(checked: boolean) { update({ invertX: checked }); }
-
-  // Per-axis input mode lives on the profile root (not inside StickConfig)
-  function updateMode(key: "rightStickXMode" | "rightStickYMode", v: string) {
-    if (v !== "analog" && v !== "gyroscope") return;
-    profile.update((p) => ({ ...p, [key]: v as AxisInputMode }));
-    markDirty();
-    pushToEngine();
-  }
 </script>
 
 <div class="space-y-5 px-4">
-  <!-- Per-axis input mode: only meaningful for the mouse-driven right stick -->
-  {#if stickKey === "rightStick"}
-    <div class="space-y-3 py-1">
-      <div class="space-y-1.5">
-        <span class="text-xs font-medium">{$t("rsm.xAxis")}</span>
-        <Select.Root
-          type="single"
-          value={$profile.rightStickXMode}
-          onValueChange={(v) => v && updateMode("rightStickXMode", v)}
-        >
-          <Select.Trigger class="w-full h-8 text-xs">
-            {$profile.rightStickXMode === "analog" ? $t("rsm.analog") : $t("rsm.gyroscope")}
-          </Select.Trigger>
-          <Select.Content>
-            <Select.Item value="analog" label={$t("rsm.analog")} />
-            <Select.Item value="gyroscope" label={$t("rsm.gyroscope")} />
-          </Select.Content>
-        </Select.Root>
-        <p class="text-[11px] text-muted-foreground">
-          {$profile.rightStickXMode === "analog" ? $t("rsm.analogHint") : $t("rsm.gyroHint")}
-        </p>
-      </div>
-      <div class="space-y-1.5">
-        <span class="text-xs font-medium">{$t("rsm.yAxis")}</span>
-        <Select.Root
-          type="single"
-          value={$profile.rightStickYMode}
-          onValueChange={(v) => v && updateMode("rightStickYMode", v)}
-        >
-          <Select.Trigger class="w-full h-8 text-xs">
-            {$profile.rightStickYMode === "analog" ? $t("rsm.analog") : $t("rsm.gyroscope")}
-          </Select.Trigger>
-          <Select.Content>
-            <Select.Item value="analog" label={$t("rsm.analog")} />
-            <Select.Item value="gyroscope" label={$t("rsm.gyroscope")} />
-          </Select.Content>
-        </Select.Root>
-        <p class="text-[11px] text-muted-foreground">
-          {$profile.rightStickYMode === "analog" ? $t("rsm.analogHint") : $t("rsm.gyroHint")}
-        </p>
-      </div>
-    </div>
-  {/if}
-
   <!-- Sensitivity -->
   <div class="space-y-2 py-1">
     <div class="flex items-center justify-between">

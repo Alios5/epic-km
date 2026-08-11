@@ -1,5 +1,5 @@
 use crate::keycode::{code_to_scancode, is_mouse_code};
-use crate::profile::{AxisInputMode, Profile, StickCurve, StickDirection};
+use crate::profile::{AxisInputMode, ControllerType, Profile, StickCurve, StickDirection};
 
 /// Gamepad button bitflags matching XUSB_REPORT buttons.
 #[derive(Debug, Clone, Copy, Default)]
@@ -245,7 +245,15 @@ pub fn map_input(
 
     // Right stick: each axis independently is Analog (velocity-based,
     // snaps back to 0) or Gyroscope (accumulated, holds position).
-    let rx = match profile.right_stick_x_mode {
+    // Gyroscope mode only applies to the DS4 target — an XUSB pad has no
+    // motion channels, so both axes fall back to Analog in Xbox 360 mode
+    // (the UI also hides these selectors unless DS4 is selected).
+    let (x_mode, y_mode) = if profile.controller_type == ControllerType::Ds4 {
+        (profile.right_stick_x_mode, profile.right_stick_y_mode)
+    } else {
+        (AxisInputMode::Analog, AxisInputMode::Analog)
+    };
+    let rx = match x_mode {
         AxisInputMode::Analog => {
             let target = process_axis_analog(
                 vel_dx,
@@ -272,7 +280,7 @@ pub fn map_input(
         }
     };
 
-    let ry = match profile.right_stick_y_mode {
+    let ry = match y_mode {
         AxisInputMode::Analog => {
             let target = process_axis_analog(
                 vel_dy,
