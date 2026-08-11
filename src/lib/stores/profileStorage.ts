@@ -30,6 +30,8 @@ export async function loadProfile(name: string): Promise<Profile> {
     controllerType: data.controllerType ?? "xbox360",
     rightStickXMode: data.rightStickXMode ?? "analog",
     rightStickYMode: data.rightStickYMode ?? "analog",
+    gyroBiasPitch: data.gyroBiasPitch ?? 1,
+    gyroBiasYaw: data.gyroBiasYaw ?? 0,
     leftStick: normalizeStick(data.leftStick, 0.0),
     rightStick: normalizeStick(data.rightStick, 0.3),
   };
