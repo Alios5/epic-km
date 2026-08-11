@@ -27,6 +27,7 @@ export async function loadProfile(name: string): Promise<Profile> {
   const normalized: Profile = {
     ...data,
     hideCursor: data.hideCursor ?? true,
+    controllerType: data.controllerType ?? "xbox360",
     rightStickXMode: data.rightStickXMode ?? "analog",
     rightStickYMode: data.rightStickYMode ?? "analog",
     leftStick: normalizeStick(data.leftStick, 0.0),

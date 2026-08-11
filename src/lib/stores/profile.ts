@@ -22,6 +22,8 @@ export type StickDirection = "up" | "down" | "left" | "right";
 
 export type AxisInputMode = "analog" | "gyroscope";
 
+export type ControllerType = "xbox360" | "ds4";
+
 export interface KeyboardStickMapping {
   id: string;
   key: string;
@@ -56,6 +58,8 @@ export interface Profile {
   captureToggleKey: string;
   /** Hide the OS cursor while capture mode is active */
   hideCursor: boolean;
+  /** Which virtual controller to emulate (Xbox 360 or DualShock 4) */
+  controllerType: ControllerType;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -142,6 +146,7 @@ function defaultProfile(): Profile {
     triggerThreshold: 0.5,
     captureToggleKey: "F1",
     hideCursor: true,
+    controllerType: "xbox360",
   };
 }
 

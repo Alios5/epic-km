@@ -49,6 +49,22 @@ fn default_axis_mode() -> AxisInputMode {
     AxisInputMode::Analog
 }
 
+/// Which virtual controller the engine exposes through ViGEmBus.
+/// `Xbox360`: XUSB pad — no motion sensors, but universally supported.
+/// `Ds4`: DualShock 4 — buttons/sticks identical, plus gyro/accelerometer
+/// channels (motion wiring comes in a later step).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum ControllerType {
+    #[serde(rename = "xbox360")]
+    Xbox360,
+    #[serde(rename = "ds4")]
+    Ds4,
+}
+
+fn default_controller_type() -> ControllerType {
+    ControllerType::Xbox360
+}
+
 /// Default per-axis sensitivity multiplier (neutral).
 fn default_axis_sensitivity() -> f64 {
     1.0
@@ -104,6 +120,10 @@ pub struct Profile {
     /// serde default keeps older profile files valid.
     #[serde(default = "default_hide_cursor")]
     pub hide_cursor: bool,
+    /// Which virtual controller to emulate (Xbox 360 or DualShock 4).
+    /// serde default keeps older profile files valid (Xbox 360).
+    #[serde(default = "default_controller_type")]
+    pub controller_type: ControllerType,
 }
 
 impl Default for Profile {
@@ -138,6 +158,7 @@ impl Default for Profile {
             trigger_threshold: 0.5,
             capture_toggle_key: "F1".to_string(),
             hide_cursor: true,
+            controller_type: ControllerType::Xbox360,
         }
     }
 }

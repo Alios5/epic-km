@@ -1,5 +1,5 @@
-use crate::mapping::{map_input, GamepadState, RawInputState};
-use crate::profile::Profile;
+use crate::mapping::{map_input, GamepadButtons, GamepadState, RawInputState};
+use crate::profile::{ControllerType, Profile};
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -222,7 +222,7 @@ pub fn vigem_available() -> bool {
 fn emission_thread(state: Arc<EngineState>) {
     #[cfg(target_os = "windows")]
     {
-        use vigem_client::{Client, TargetId, XButtons, XGamepad, Xbox360Wired};
+        use vigem_client::{Client, DS4ReportEx, DualShock4Wired, TargetId, XButtons, XGamepad, Xbox360Wired};
         use windows::Win32::Media::{timeBeginPeriod, timeEndPeriod};
         use windows::Win32::System::Threading::{
             GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
@@ -236,20 +236,91 @@ fn emission_thread(state: Arc<EngineState>) {
                 return;
             }
         };
+        // Shared between targets so the controller type can be switched live.
+        let client = Arc::new(client);
 
-        let mut target = Xbox360Wired::new(client, TargetId::XBOX360_WIRED);
-        if let Err(e) = target.plugin() {
-            elog(&state, &format!("Failed to plugin ViGEmBus target: {}", e));
-            state.running.store(false, Ordering::SeqCst);
-            return;
+        /// The currently plugged virtual controller — exactly one at a time.
+        enum VirtualTarget {
+            Xbox(Xbox360Wired<Arc<Client>>),
+            Ds4(DualShock4Wired<Arc<Client>>),
         }
 
-        // Wait for target to be ready
-        if let Err(e) = target.wait_ready() {
-            elog(&state, &format!("ViGEmBus target not ready: {}", e));
-            state.running.store(false, Ordering::SeqCst);
-            return;
+        impl VirtualTarget {
+            fn unplug(&mut self) {
+                match self {
+                    VirtualTarget::Xbox(t) => { let _ = t.unplug(); }
+                    VirtualTarget::Ds4(t) => { let _ = t.unplug(); }
+                }
+            }
         }
+
+        /// Plugs a fresh virtual controller of the requested type.
+        fn plug_target(client: &Arc<Client>, kind: ControllerType) -> Result<VirtualTarget, String> {
+            match kind {
+                ControllerType::Xbox360 => {
+                    let mut t = Xbox360Wired::new(client.clone(), TargetId::XBOX360_WIRED);
+                    t.plugin().map_err(|e| format!("plugin Xbox 360 failed: {}", e))?;
+                    t.wait_ready().map_err(|e| format!("Xbox 360 target not ready: {}", e))?;
+                    Ok(VirtualTarget::Xbox(t))
+                }
+                ControllerType::Ds4 => {
+                    let mut t = DualShock4Wired::new(client.clone(), TargetId::DUALSHOCK4_WIRED);
+                    t.plugin().map_err(|e| format!("plugin DualShock 4 failed: {}", e))?;
+                    t.wait_ready().map_err(|e| format!("DualShock 4 target not ready: {}", e))?;
+                    Ok(VirtualTarget::Ds4(t))
+                }
+            }
+        }
+
+        /// XInput i16 axis (-32768..32767, +up) → DS4 u8 axis (0x00..0xFF,
+        /// 0x80 center). Y axes must be flipped: DS4 HID 0 = up, 0xFF = down.
+        fn xusb_to_ds4_axis(v: i16, flip: bool) -> u8 {
+            let v = if flip { -(v as i32) } else { v as i32 };
+            ((v.clamp(-32768, 32767) + 32768) >> 8) as u8
+        }
+
+        /// Maps GamepadButtons (Xbox naming) to the DS4 `wButtons` word:
+        /// low nibble = D-Pad HAT (0=N clockwise..7=NW, 8=neutral), then
+        /// Square/Cross/Circle/Triangle, L1/R1/L2/R2, Share/Options, L3/R3.
+        fn ds4_buttons(b: &GamepadButtons) -> u16 {
+            let hat: u16 = match (b.dpad_up, b.dpad_right, b.dpad_down, b.dpad_left) {
+                (true, false, false, false) => 0,
+                (true, true, false, false) => 1,
+                (false, true, false, false) => 2,
+                (false, true, true, false) => 3,
+                (false, false, true, false) => 4,
+                (false, false, true, true) => 5,
+                (false, false, false, true) => 6,
+                (true, false, false, true) => 7,
+                _ => 8,
+            };
+            let mut w = hat;
+            if b.x { w |= 1 << 4; }              // Square
+            if b.a { w |= 1 << 5; }              // Cross
+            if b.b { w |= 1 << 6; }              // Circle
+            if b.y { w |= 1 << 7; }              // Triangle
+            if b.left_shoulder { w |= 1 << 8; }  // L1
+            if b.right_shoulder { w |= 1 << 9; } // R1
+            if b.left_trigger { w |= 1 << 10; }  // L2 (digital)
+            if b.right_trigger { w |= 1 << 11; } // R2 (digital)
+            if b.back { w |= 1 << 12; }          // Share
+            if b.start { w |= 1 << 13; }         // Options
+            if b.left_thumb { w |= 1 << 14; }    // L3
+            if b.right_thumb { w |= 1 << 15; }   // R3
+            w
+        }
+
+        // Plug the controller type requested by the current profile.
+        let mut current_kind = { state.profile.lock().controller_type };
+        let mut failed_kind: Option<ControllerType> = None;
+        let mut target = match plug_target(&client, current_kind) {
+            Ok(t) => t,
+            Err(e) => {
+                elog(&state, &format!("Failed to plug virtual controller: {}", e));
+                state.running.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
 
         // Low-latency setup: 1 ms timer resolution, a high-priority thread to
         // minimise scheduling jitter, and a HIGH-RESOLUTION waitable timer
@@ -293,12 +364,41 @@ fn emission_thread(state: Arc<EngineState>) {
         elog(&state, "Emission thread started — ViGEmBus connected");
 
         while state.running.load(Ordering::SeqCst) {
-            // Read polling rate from profile (period in 100 ns units)
-            let hz = {
+            // Read polling rate + controller type from profile (period in 100 ns units)
+            let (hz, wanted_kind) = {
                 let p = state.profile.lock();
-                p.right_stick.refresh_interval.max(1)
+                (p.right_stick.refresh_interval.max(1), p.controller_type)
             };
             let period_100ns = 10_000_000i64 / hz as i64;
+
+            // Hot-switch the virtual controller when the profile asks for a
+            // different type: plug the new one first (both coexist on the
+            // bus), then unplug the old one — if plugging fails the previous
+            // controller keeps working. `failed_kind` avoids retry-spamming
+            // every tick until the user changes the selection again.
+            if wanted_kind != current_kind && failed_kind != Some(wanted_kind) {
+                match plug_target(&client, wanted_kind) {
+                    Ok(new_target) => {
+                        target.unplug();
+                        target = new_target;
+                        current_kind = wanted_kind;
+                        elog(&state, &format!(
+                            "Virtual controller switched to {}",
+                            match wanted_kind {
+                                ControllerType::Xbox360 => "Xbox 360",
+                                ControllerType::Ds4 => "DualShock 4",
+                            }
+                        ));
+                    }
+                    Err(e) => {
+                        elog(&state, &format!("Controller switch failed (keeping previous): {}", e));
+                        failed_kind = Some(wanted_kind);
+                    }
+                }
+            }
+            if wanted_kind == current_kind {
+                failed_kind = None;
+            }
 
             // Map input — the whole gamepad report is gated on capture mode.
             // When capture is OFF (mouse2joystick-style idle state), the virtual
@@ -329,36 +429,58 @@ fn emission_thread(state: Arc<EngineState>) {
                 }
             }
 
-            // Build XUSB report
+            // Build + submit the report for the active controller type
             let b = gamepad_state.buttons;
-            let mut raw_buttons: u16 = 0;
-            if b.dpad_up { raw_buttons |= XButtons::UP; }
-            if b.dpad_down { raw_buttons |= XButtons::DOWN; }
-            if b.dpad_left { raw_buttons |= XButtons::LEFT; }
-            if b.dpad_right { raw_buttons |= XButtons::RIGHT; }
-            if b.start { raw_buttons |= XButtons::START; }
-            if b.back { raw_buttons |= XButtons::BACK; }
-            if b.left_thumb { raw_buttons |= XButtons::LTHUMB; }
-            if b.right_thumb { raw_buttons |= XButtons::RTHUMB; }
-            if b.left_shoulder { raw_buttons |= XButtons::LB; }
-            if b.right_shoulder { raw_buttons |= XButtons::RB; }
-            if b.a { raw_buttons |= XButtons::A; }
-            if b.b { raw_buttons |= XButtons::B; }
-            if b.x { raw_buttons |= XButtons::X; }
-            if b.y { raw_buttons |= XButtons::Y; }
+            match &mut target {
+                VirtualTarget::Xbox(t) => {
+                    // Build XUSB report
+                    let mut raw_buttons: u16 = 0;
+                    if b.dpad_up { raw_buttons |= XButtons::UP; }
+                    if b.dpad_down { raw_buttons |= XButtons::DOWN; }
+                    if b.dpad_left { raw_buttons |= XButtons::LEFT; }
+                    if b.dpad_right { raw_buttons |= XButtons::RIGHT; }
+                    if b.start { raw_buttons |= XButtons::START; }
+                    if b.back { raw_buttons |= XButtons::BACK; }
+                    if b.left_thumb { raw_buttons |= XButtons::LTHUMB; }
+                    if b.right_thumb { raw_buttons |= XButtons::RTHUMB; }
+                    if b.left_shoulder { raw_buttons |= XButtons::LB; }
+                    if b.right_shoulder { raw_buttons |= XButtons::RB; }
+                    if b.a { raw_buttons |= XButtons::A; }
+                    if b.b { raw_buttons |= XButtons::B; }
+                    if b.x { raw_buttons |= XButtons::X; }
+                    if b.y { raw_buttons |= XButtons::Y; }
 
-            let report = XGamepad {
-                buttons: XButtons { raw: raw_buttons },
-                left_trigger: if b.left_trigger { 255 } else { 0 },
-                right_trigger: if b.right_trigger { 255 } else { 0 },
-                thumb_lx: gamepad_state.left_stick_x,
-                thumb_ly: gamepad_state.left_stick_y,
-                thumb_rx: gamepad_state.right_stick_x,
-                thumb_ry: gamepad_state.right_stick_y,
-            };
+                    let report = XGamepad {
+                        buttons: XButtons { raw: raw_buttons },
+                        left_trigger: if b.left_trigger { 255 } else { 0 },
+                        right_trigger: if b.right_trigger { 255 } else { 0 },
+                        thumb_lx: gamepad_state.left_stick_x,
+                        thumb_ly: gamepad_state.left_stick_y,
+                        thumb_rx: gamepad_state.right_stick_x,
+                        thumb_ry: gamepad_state.right_stick_y,
+                    };
 
-            if let Err(e) = target.update(&report) {
-                eprintln!("[input-engine] ViGEmBus update error: {}", e);
+                    if let Err(e) = t.update(&report) {
+                        eprintln!("[input-engine] ViGEmBus update error: {}", e);
+                    }
+                }
+                VirtualTarget::Ds4(t) => {
+                    // Full extended report (gyro/accel channels stay neutral
+                    // for now — the extended IOCTL path is already exercised,
+                    // motion wiring is the next step).
+                    let mut report = DS4ReportEx::default();
+                    report.thumb_lx = xusb_to_ds4_axis(gamepad_state.left_stick_x, false);
+                    report.thumb_ly = xusb_to_ds4_axis(gamepad_state.left_stick_y, true);
+                    report.thumb_rx = xusb_to_ds4_axis(gamepad_state.right_stick_x, false);
+                    report.thumb_ry = xusb_to_ds4_axis(gamepad_state.right_stick_y, true);
+                    report.buttons = ds4_buttons(&b);
+                    report.trigger_l = if b.left_trigger { 255 } else { 0 };
+                    report.trigger_r = if b.right_trigger { 255 } else { 0 };
+
+                    if let Err(e) = t.update_ex(&report) {
+                        eprintln!("[input-engine] ViGEmBus DS4 update error: {}", e);
+                    }
+                }
             }
 
             // Absolute-deadline pacing (no drift): wait until the next tick.
@@ -393,7 +515,7 @@ fn emission_thread(state: Arc<EngineState>) {
             unsafe { let _ = windows::Win32::Foundation::CloseHandle(t); };
         }
         unsafe { timeEndPeriod(1); }
-        let _ = target.unplug();
+        target.unplug();
         elog(&state, "Emission thread stopped");
     }
 

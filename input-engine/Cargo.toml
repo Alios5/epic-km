@@ -22,4 +22,6 @@ windows = { version = "0.62", features = [
     "Win32_System_Threading",
     "Win32_Media",
 ] }
-vigem-client = "0.1"
+# Vendored copy (../vigem-client) patched with the extended DS4 report
+# (gyroscope/accelerometer) that upstream leaves commented out.
+vigem-client = { path = "../vigem-client", features = ["unstable_ds4"] }
