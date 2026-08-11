@@ -645,6 +645,8 @@ mod win_capture {
                 input.smooth_ry = 0.0;
                 input.smooth_lx = 0.0;
                 input.smooth_ly = 0.0;
+                input.gyro_rx = 0.0;
+                input.gyro_ry = 0.0;
             }
 
             // Unclip cursor

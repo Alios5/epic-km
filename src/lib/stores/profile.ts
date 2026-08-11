@@ -20,6 +20,8 @@ export interface KeyboardMapping {
 
 export type StickDirection = "up" | "down" | "left" | "right";
 
+export type AxisInputMode = "analog" | "gyroscope";
+
 export interface KeyboardStickMapping {
   id: string;
   key: string;
@@ -43,6 +45,11 @@ export interface StickConfig {
 export interface Profile {
   keyboardToButton: KeyboardMapping[];
   keyboardToLeftStick: KeyboardStickMapping[];
+  /** Independent per-axis mode for the mouse-driven right stick:
+   * "analog" = velocity-based, snaps to 0 when mouse stops;
+   * "gyroscope" = accumulated position, holds when mouse stops. */
+  rightStickXMode: AxisInputMode;
+  rightStickYMode: AxisInputMode;
   leftStick: StickConfig;
   rightStick: StickConfig;
   triggerThreshold: number;
@@ -108,6 +115,8 @@ function defaultProfile(): Profile {
       { id: "ls3", key: "KeyA", direction: "left" },
       { id: "ls4", key: "KeyD", direction: "right" },
     ],
+    rightStickXMode: "analog",
+    rightStickYMode: "analog",
     leftStick: {
       sensitivity: 1.0,
       sensitivityX: 1.0,

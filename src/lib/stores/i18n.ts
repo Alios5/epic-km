@@ -69,6 +69,13 @@ const fr = {
   // Left stick keyboard mapping
   "lsm.title": "Stick gauche (clavier)",
   "lsm.empty": "Aucune touche assignée.",
+  // Right stick per-axis mode (Analog / Gyroscope)
+  "rsm.xAxis": "Axe X",
+  "rsm.yAxis": "Axe Y",
+  "rsm.analog": "Analogique",
+  "rsm.gyroscope": "Gyroscope",
+  "rsm.analogHint": "La vitesse de la souris pilote l'axe — revient à zéro quand la souris s'arrête.",
+  "rsm.gyroHint": "La position de la souris s'accumule — l'axe garde sa valeur quand la souris s'arrête.",
   // Key capture input
   "keycap.press": "Appuyez sur une touche…",
   // Assignment popover
@@ -177,6 +184,12 @@ const en: Record<MessageKey, string> = {
   "dir.right": "Right",
   "lsm.title": "Left stick (keyboard)",
   "lsm.empty": "No key assigned.",
+  "rsm.xAxis": "X axis",
+  "rsm.yAxis": "Y axis",
+  "rsm.analog": "Analog",
+  "rsm.gyroscope": "Gyroscope",
+  "rsm.analogHint": "Mouse velocity drives the axis — snaps back to zero when the mouse stops.",
+  "rsm.gyroHint": "Mouse position accumulates — the axis holds its value when the mouse stops.",
   "keycap.press": "Press a key…",
   "pop.currentKey": "Current key:",
   "pop.none": "None",

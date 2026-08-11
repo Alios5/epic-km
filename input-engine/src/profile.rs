@@ -32,6 +32,23 @@ pub enum StickCurve {
     Exponential,
 }
 
+/// How a single mouse-driven stick axis behaves.
+/// `Analog`: velocity-based, snaps back to 0 when the mouse stops (classic
+/// mouse-look, matches the stick's own deadzone/curve/sensitivity).
+/// `Gyroscope`: accumulated position that holds in place when the mouse
+/// stops, exactly like a controller's physical gyroscope — it only moves
+/// when the mouse moves, and never auto-recenters.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AxisInputMode {
+    Analog,
+    Gyroscope,
+}
+
+fn default_axis_mode() -> AxisInputMode {
+    AxisInputMode::Analog
+}
+
 /// Default per-axis sensitivity multiplier (neutral).
 fn default_axis_sensitivity() -> f64 {
     1.0
@@ -71,6 +88,14 @@ pub struct StickConfig {
 pub struct Profile {
     pub keyboard_to_button: Vec<KeyboardMapping>,
     pub keyboard_to_left_stick: Vec<KeyboardStickMapping>,
+    /// Independent per-axis mode for the mouse-driven right stick: each of
+    /// X and Y can be Analog (velocity-based, snaps to 0) or Gyroscope
+    /// (accumulated, holds position). serde defaults keep older profile
+    /// files valid (both default to Analog, matching prior behavior).
+    #[serde(default = "default_axis_mode")]
+    pub right_stick_x_mode: AxisInputMode,
+    #[serde(default = "default_axis_mode")]
+    pub right_stick_y_mode: AxisInputMode,
     pub left_stick: StickConfig,
     pub right_stick: StickConfig,
     pub trigger_threshold: f64,
@@ -86,6 +111,8 @@ impl Default for Profile {
         Profile {
             keyboard_to_button: vec![],
             keyboard_to_left_stick: vec![],
+            right_stick_x_mode: AxisInputMode::Analog,
+            right_stick_y_mode: AxisInputMode::Analog,
             left_stick: StickConfig {
                 sensitivity: 1.0,
                 sensitivity_x: 1.0,

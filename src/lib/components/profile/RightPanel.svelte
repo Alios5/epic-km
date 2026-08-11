@@ -1,6 +1,7 @@
 <script lang="ts">
   import ButtonAssignRow from "$lib/components/profile/ButtonAssignRow.svelte";
   import StickSettings from "$lib/components/profile/StickSettings.svelte";
+  import RightStickMapping from "$lib/components/profile/RightStickMapping.svelte";
   import { t } from "$lib/stores/i18n";
   import GamepadIcon from "@lucide/svelte/icons/gamepad-2";
 </script>
@@ -36,6 +37,7 @@
     <div class="space-y-3">
       <ButtonAssignRow button="RightThumb" label={$t("panel.stickClick")} />
       <StickSettings stickKey="rightStick" />
+      <RightStickMapping />
     </div>
   </div>
 </aside>
