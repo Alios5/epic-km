@@ -360,6 +360,10 @@ fn emission_thread(state: Arc<EngineState>) {
             .ok()
         };
         let mut next_tick = qpc_100ns(qpc_freq);
+        // DS4 motion bookkeeping: the report timestamp is a u16 in 5.33 µs
+        // units and must advance monotonically (readers reconstruct the
+        // sensor clock from its deltas); it wraps every ~350 ms by design.
+        let mut ds4_timestamp: u16 = 0;
 
         elog(&state, "Emission thread started — ViGEmBus connected");
 
@@ -370,6 +374,8 @@ fn emission_thread(state: Arc<EngineState>) {
                 (p.right_stick.refresh_interval.max(1), p.controller_type)
             };
             let period_100ns = 10_000_000i64 / hz as i64;
+            // Timestamp step per report in 5.33 µs units (µs × 3/16).
+            let ds4_ts_step = ((1_000_000i64 / hz as i64) * 3 / 16) as u16;
 
             // Hot-switch the virtual controller when the profile asks for a
             // different type: plug the new one first (both coexist on the
@@ -465,9 +471,15 @@ fn emission_thread(state: Arc<EngineState>) {
                     }
                 }
                 VirtualTarget::Ds4(t) => {
-                    // Full extended report (gyro/accel channels stay neutral
-                    // for now — the extended IOCTL path is already exercised,
-                    // motion wiring is the next step).
+                    // Full extended report, motion channels included:
+                    // - gyro rates come from axes in Gyroscope mode
+                    //   (raw units, 16 LSB per °/s; 0 = not rotating),
+                    // - the accelerometer reports a constant rest gravity
+                    //   matching a real DS4 held in playing position
+                    //   (measured on hardware: ≈ -1 g on the Y axis,
+                    //   raw unit 1/8192 g),
+                    // - the sensor timestamp advances by one report period
+                    //   per tick so readers can rebuild the sensor clock.
                     let mut report = DS4ReportEx::default();
                     report.thumb_lx = xusb_to_ds4_axis(gamepad_state.left_stick_x, false);
                     report.thumb_ly = xusb_to_ds4_axis(gamepad_state.left_stick_y, true);
@@ -476,6 +488,16 @@ fn emission_thread(state: Arc<EngineState>) {
                     report.buttons = ds4_buttons(&b);
                     report.trigger_l = if b.left_trigger { 255 } else { 0 };
                     report.trigger_r = if b.right_trigger { 255 } else { 0 };
+                    ds4_timestamp = ds4_timestamp.wrapping_add(ds4_ts_step);
+                    report.timestamp = ds4_timestamp;
+                    report.battery_lvl = 0x1B; // wired: cable connected + full
+                    report.battery_lvl_special = 0x1B; // status byte read by SDL
+                    report.gyro_x = gamepad_state.gyro_pitch;
+                    report.gyro_y = gamepad_state.gyro_yaw;
+                    report.gyro_z = 0;
+                    report.accel_x = 0;
+                    report.accel_y = -8192;
+                    report.accel_z = 0;
 
                     if let Err(e) = t.update_ex(&report) {
                         eprintln!("[input-engine] ViGEmBus DS4 update error: {}", e);
@@ -767,8 +789,6 @@ mod win_capture {
                 input.smooth_ry = 0.0;
                 input.smooth_lx = 0.0;
                 input.smooth_ly = 0.0;
-                input.gyro_rx = 0.0;
-                input.gyro_ry = 0.0;
             }
 
             // Unclip cursor

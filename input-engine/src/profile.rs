@@ -35,9 +35,9 @@ pub enum StickCurve {
 /// How a single mouse-driven stick axis behaves.
 /// `Analog`: velocity-based, snaps back to 0 when the mouse stops (classic
 /// mouse-look, matches the stick's own deadzone/curve/sensitivity).
-/// `Gyroscope`: accumulated position that holds in place when the mouse
-/// stops, exactly like a controller's physical gyroscope — it only moves
-/// when the mouse moves, and never auto-recenters.
+/// `Gyroscope` (DS4 only): the axis stops driving the stick (which stays
+/// centered) and instead feeds the controller's real gyroscope channel —
+/// mouse motion becomes an angular rate, like tilting a physical DS4.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum AxisInputMode {
@@ -52,7 +52,7 @@ fn default_axis_mode() -> AxisInputMode {
 /// Which virtual controller the engine exposes through ViGEmBus.
 /// `Xbox360`: XUSB pad — no motion sensors, but universally supported.
 /// `Ds4`: DualShock 4 — buttons/sticks identical, plus gyro/accelerometer
-/// channels (motion wiring comes in a later step).
+/// channels driven by axes in Gyroscope mode.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum ControllerType {
     #[serde(rename = "xbox360")]

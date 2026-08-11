@@ -47,8 +47,8 @@
   const DS4_VW = 268;
   const DS4_VH = 174;
   const ds4Zones: Zone[] = [
-    { button: "LT", x: 2, y: 1, w: 26, h: 12, zoneLabel: "LT" },
-    { button: "RT", x: 240, y: 1, w: 26, h: 12, zoneLabel: "RT" },
+    { button: "LT", x: 2, y: 1, w: 26, h: 12, zoneLabel: "L2" },
+    { button: "RT", x: 240, y: 1, w: 26, h: 12, zoneLabel: "R2" },
     { button: "LB", x: 31, y: 0, w: 41, h: 14 },
     { button: "RB", x: 196, y: 0, w: 41, h: 14 },
     { button: "Back", x: 75, y: 19, w: 12, h: 19 },

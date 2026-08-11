@@ -2,6 +2,7 @@
   import ButtonAssignRow from "$lib/components/profile/ButtonAssignRow.svelte";
   import StickSettings from "$lib/components/profile/StickSettings.svelte";
   import RightStickMapping from "$lib/components/profile/RightStickMapping.svelte";
+  import { profile } from "$lib/stores/profile";
   import { t } from "$lib/stores/i18n";
   import GamepadIcon from "@lucide/svelte/icons/gamepad-2";
 </script>
@@ -17,9 +18,9 @@
     </div>
   </div>
 
-  <!-- Section: Face buttons A/B/X/Y -->
+  <!-- Section: Face buttons A/B/X/Y (Cross/Circle/Square/Triangle on DS4) -->
   <div class="px-3 py-3 border-b border-border">
-    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{$t("panel.faceButtons")}</h2>
+    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{$profile.controllerType === "ds4" ? $t("panel.faceButtonsDs4") : $t("panel.faceButtons")}</h2>
     <div class="space-y-1.5">
       <ButtonAssignRow button="A" label="A" />
       <ButtonAssignRow button="B" label="B" />

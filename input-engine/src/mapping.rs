@@ -32,6 +32,11 @@ pub struct GamepadState {
     pub left_stick_y: i16,
     pub right_stick_x: i16,
     pub right_stick_y: i16,
+    /// DS4 gyroscope output in raw units (16 LSB per °/s), fed by
+    /// mouse-driven axes in Gyroscope mode. Zero = controller not rotating.
+    /// Ignored by the Xbox 360 target, which has no motion channels.
+    pub gyro_pitch: i16, // report gyro_x
+    pub gyro_yaw: i16,   // report gyro_y
 }
 
 /// Raw input state from the capture thread.
@@ -50,20 +55,23 @@ pub struct RawInputState {
     pub smooth_ry: f64,
     pub smooth_lx: f64,
     pub smooth_ly: f64,
-    /// Accumulated stick position for axes in Gyroscope mode: holds in
-    /// place when the mouse stops, only moves when the mouse moves.
-    pub gyro_rx: f64,
-    pub gyro_ry: f64,
 }
 
 /// Stick fraction produced per pixel/second of mouse speed at sensitivity 1.0.
 /// ~800 px/s (moderate swipe) therefore reaches full stick deflection.
 const MOUSE_SPEED_SCALE: f64 = 0.00125;
 
-/// Stick fraction accumulated per raw pixel of mouse movement at
-/// sensitivity 1.0, independent of polling rate — a full swipe of N pixels
-/// always accumulates the same total displacement regardless of Hz.
-const GYRO_SCALE: f64 = 0.0009;
+/// Degrees of gyroscope rotation reported per raw mouse pixel at
+/// sensitivity 1.0. Each report carries the rotation accumulated during
+/// its tick converted to a per-second rate, so the *integral* of the gyro
+/// output over time always equals the total mouse travel — the burstiness
+/// of the OS mouse stream doesn't distort the aim.
+const GYRO_DEG_PER_PX: f64 = 0.05;
+
+/// DS4 gyroscope raw unit: 16 LSB per degree/second. Matches the factory
+/// defaults every reader falls back to (Linux hid-playstation:
+/// DS4_GYRO_RES_PER_DEG_S; SDL: gyro_numerator/denominator = 1/16).
+const DS4_GYRO_LSB_PER_DPS: f64 = 16.0;
 
 /// Exponential smoothing towards the target, independent of the polling rate.
 /// `amount` (0.0 = off .. 0.95) maps to a time constant of amount * 0.25 s.
@@ -136,20 +144,21 @@ fn process_axis_analog(
     v
 }
 
-/// Processes a single mouse-driven axis in Gyroscope mode: the raw pixel
-/// delta is accumulated onto the previous position and clamped — the axis
-/// holds its position when the mouse stops moving, and only changes when
-/// the mouse moves, exactly like a physical gyroscope.
+/// Processes a mouse-driven axis in Gyroscope mode: converts the raw pixel
+/// delta of this tick into a DS4 gyroscope angular rate, in raw units
+/// (16 LSB per °/s). When the mouse stops the rate is zero — like a real
+/// gyroscope, which only reports while the controller is rotating.
 fn process_axis_gyro(
-    prev: f64,
     raw_pixels: f64,
     sensitivity: f64,
     axis_sensitivity: f64,
     invert: bool,
-) -> f64 {
-    let mut delta = raw_pixels * GYRO_SCALE * sensitivity * axis_sensitivity;
-    if invert { delta = -delta; }
-    (prev + delta).clamp(-1.0, 1.0)
+    hz: f64,
+) -> i16 {
+    let mut degrees = raw_pixels * GYRO_DEG_PER_PX * sensitivity * axis_sensitivity;
+    if invert { degrees = -degrees; }
+    let dps = degrees * hz;
+    (dps * DS4_GYRO_LSB_PER_DPS).clamp(i16::MIN as f64, i16::MAX as f64) as i16
 }
 
 /// Applies stick processing: global + per-axis sensitivity, deadzone, curve,
@@ -244,7 +253,8 @@ pub fn map_input(
     input.mouse_dy = 0;
 
     // Right stick: each axis independently is Analog (velocity-based,
-    // snaps back to 0) or Gyroscope (accumulated, holds position).
+    // snaps back to 0) or Gyroscope (drives the DS4's real gyro channel
+    // instead of the stick, which then stays centered).
     // Gyroscope mode only applies to the DS4 target — an XUSB pad has no
     // motion channels, so both axes fall back to Analog in Xbox 360 mode
     // (the UI also hides these selectors unless DS4 is selected).
@@ -268,15 +278,16 @@ pub fn map_input(
             smoothed
         }
         AxisInputMode::Gyroscope => {
-            let pos = process_axis_gyro(
-                input.gyro_rx,
+            // Mouse X drives the DS4's yaw gyroscope channel (report
+            // gyro_y); the stick axis itself stays centered.
+            state.gyro_yaw = process_axis_gyro(
                 raw_dx,
                 profile.right_stick.sensitivity,
                 profile.right_stick.sensitivity_x,
                 profile.right_stick.invert_x,
+                hz,
             );
-            input.gyro_rx = pos;
-            pos
+            0.0
         }
     };
 
@@ -295,15 +306,18 @@ pub fn map_input(
             smoothed
         }
         AxisInputMode::Gyroscope => {
-            let pos = process_axis_gyro(
-                input.gyro_ry,
-                raw_dy,
+            // Mouse Y drives the DS4's pitch gyroscope channel (report
+            // gyro_x). On a real DS4 a positive pitch rate is the nose
+            // tilting up, while mouse-up arrives as negative deltas —
+            // hence the sign flip (invert_y flips it back if needed).
+            state.gyro_pitch = process_axis_gyro(
+                -raw_dy,
                 profile.right_stick.sensitivity,
                 profile.right_stick.sensitivity_y,
                 profile.right_stick.invert_y,
+                hz,
             );
-            input.gyro_ry = pos;
-            pos
+            0.0
         }
     };
 

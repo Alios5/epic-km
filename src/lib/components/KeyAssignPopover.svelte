@@ -22,6 +22,12 @@
   let currentKey = $derived(getKeyForButton($profile.keyboardToButton, button));
   let currentLabel = $derived(labelForCode(currentKey, $layoutMap, $locale));
   let friendlyName = $derived.by(() => {
+    // DS4 mode: prefer the real DualShock names (Croix, L1, Share…).
+    if ($profile.controllerType === "ds4") {
+      const ds4Key = `btn.ds4.${button}` as MessageKey;
+      const ds4Label = $t(ds4Key);
+      if (ds4Label !== ds4Key) return ds4Label;
+    }
     const key = `btn.${button}` as MessageKey;
     const label = $t(key);
     return label === key ? button : label;
