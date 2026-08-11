@@ -500,7 +500,16 @@ fn emission_thread(state: Arc<EngineState>) {
                     report.accel_z = 0;
 
                     if let Err(e) = t.update_ex(&report) {
-                        eprintln!("[input-engine] ViGEmBus DS4 update error: {}", e);
+                        // ERROR_NO_MORE_ITEMS (259) is expected, not a
+                        // failure: ViGEmBus delivers a report only when the
+                        // host has a pending interrupt-IN read, i.e. when a
+                        // game/HID client holds the device open. Right after
+                        // plug-in (or when nothing consumes the pad) the
+                        // report is simply dropped — stay quiet, it resolves
+                        // by itself once a reader attaches.
+                        if e != vigem_client::Error::WinError(259) {
+                            eprintln!("[input-engine] ViGEmBus DS4 update error: {}", e);
+                        }
                     }
                 }
             }
