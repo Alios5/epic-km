@@ -279,17 +279,6 @@ fn emission_thread(state: Arc<EngineState>) {
             ((v.clamp(-32768, 32767) + 32768) >> 8) as u8
         }
 
-        /// ViGEmBus answers the DS4 calibration feature report (0x02) with a
-        /// blob captured from real hardware, whose gyro biases are
-        /// pitch=1 / yaw=0 / roll=0. SDL-based readers (Ryujinx, Cemu…)
-        /// subtract that bias from our raw values, so a true rest state of 0
-        /// would be read as a constant -1 LSB pitch rate — the aim slowly
-        /// drifts up forever even when the mouse is perfectly still.
-        /// Pre-adding the bias makes calibrated readers see exactly the rate
-        /// we compute (0 = truly at rest). Readers that ignore calibration
-        /// are off by +1 LSB (0.06 °/s) instead of -1 — equally negligible.
-        const DS4_GYRO_PITCH_BIAS: i16 = 1;
-
         /// Maps GamepadButtons (Xbox naming) to the DS4 `wButtons` word:
         /// low nibble = D-Pad HAT (0=N clockwise..7=NW, 8=neutral), then
         /// Square/Cross/Circle/Triangle, L1/R1/L2/R2, Share/Options, L3/R3.
@@ -503,8 +492,17 @@ fn emission_thread(state: Arc<EngineState>) {
                     report.timestamp = ds4_timestamp;
                     report.battery_lvl = 0x1B; // wired: cable connected + full
                     report.battery_lvl_special = 0x1B; // status byte read by SDL
-                    report.gyro_x = gamepad_state.gyro_pitch.saturating_add(DS4_GYRO_PITCH_BIAS);
-                    report.gyro_y = gamepad_state.gyro_yaw;
+                    // Rest-offset compensation (raw LSB): motion readers
+                    // subtract their own assumed gyro bias, so we pre-add
+                    // it — "mouse still" then reads as exactly 0 °/s. The
+                    // trims are profile settings (defaults match ViGEmBus's
+                    // calibration blob: pitch 1, yaw 0).
+                    let (bias_pitch, bias_yaw) = {
+                        let p = state.profile.lock();
+                        (p.gyro_bias_pitch as i16, p.gyro_bias_yaw as i16)
+                    };
+                    report.gyro_x = gamepad_state.gyro_pitch.saturating_add(bias_pitch);
+                    report.gyro_y = gamepad_state.gyro_yaw.saturating_add(bias_yaw);
                     report.gyro_z = 0;
                     report.accel_x = 0;
                     report.accel_y = -8192;

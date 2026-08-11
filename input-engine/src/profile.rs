@@ -65,6 +65,12 @@ fn default_controller_type() -> ControllerType {
     ControllerType::Xbox360
 }
 
+/// Default DS4 gyro pitch rest-offset (raw LSB): the bias declared by
+/// ViGEmBus's hardcoded calibration blob (feature report 0x02).
+fn default_gyro_bias_pitch() -> i32 {
+    1
+}
+
 /// Default per-axis sensitivity multiplier (neutral).
 fn default_axis_sensitivity() -> f64 {
     1.0
@@ -124,6 +130,16 @@ pub struct Profile {
     /// serde default keeps older profile files valid (Xbox 360).
     #[serde(default = "default_controller_type")]
     pub controller_type: ControllerType,
+    /// Rest-offset compensation added to the DS4 gyroscope channels, in raw
+    /// LSB (16 LSB = 1 °/s). Every motion reader subtracts its own assumed
+    /// gyro bias (SDL uses the ViGEmBus calibration blob: pitch bias = 1),
+    /// so we pre-add it — a perfectly still mouse then reads as exactly
+    /// 0 °/s instead of drifting forever. Pitch defaults to 1 (the blob),
+    /// yaw to 0; adjust only if the aim still drifts at rest.
+    #[serde(default = "default_gyro_bias_pitch")]
+    pub gyro_bias_pitch: i32,
+    #[serde(default)]
+    pub gyro_bias_yaw: i32,
 }
 
 impl Default for Profile {
@@ -159,6 +175,8 @@ impl Default for Profile {
             capture_toggle_key: "F1".to_string(),
             hide_cursor: true,
             controller_type: ControllerType::Xbox360,
+            gyro_bias_pitch: 1,
+            gyro_bias_yaw: 0,
         }
     }
 }

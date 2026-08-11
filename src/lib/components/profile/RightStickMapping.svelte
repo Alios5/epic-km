@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as Select from "$lib/components/ui/select/index.js";
+  import { Slider } from "$lib/components/ui/slider/index.js";
   import { profile, markDirty, type AxisInputMode } from "$lib/stores/profile";
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
@@ -15,6 +16,28 @@
     profile.update((p) => ({ ...p, rightStickYMode: mode }));
     markDirty();
     invoke("reload_profile", { profile: get(profile) }).catch(() => {});
+  }
+
+  // Push the profile to the running engine (debounced: sliders fire many
+  // events while dragging) so trim changes apply live, without saving first
+  let pushTimer: ReturnType<typeof setTimeout> | null = null;
+  function pushToEngine() {
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => {
+      invoke("reload_profile", { profile: get(profile) }).catch(() => {});
+    }, 150);
+  }
+
+  function updateBiasPitch(v: number) {
+    profile.update((p) => ({ ...p, gyroBiasPitch: v }));
+    markDirty();
+    pushToEngine();
+  }
+
+  function updateBiasYaw(v: number) {
+    profile.update((p) => ({ ...p, gyroBiasYaw: v }));
+    markDirty();
+    pushToEngine();
   }
 </script>
 
@@ -62,6 +85,27 @@
       <p class="text-[11px] text-muted-foreground">
         {$profile.rightStickYMode === "analog" ? $t("rsm.analogHint") : $t("rsm.gyroHint")}
       </p>
+    </div>
+
+    <!-- Gyro drift compensation: rest-offset trims (raw LSB) letting the
+         user zero out the residual bias their motion reader assumes. -->
+    <div class="space-y-3 pt-1 border-t border-border">
+      <span class="text-xs text-muted-foreground">{$t("rsm.trimTitle")}</span>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-medium">{$t("rsm.trimPitch")}</span>
+          <span class="text-[11px] text-muted-foreground tabular-nums">{$profile.gyroBiasPitch}</span>
+        </div>
+        <Slider type="single" value={$profile.gyroBiasPitch} onValueChange={updateBiasPitch} min={-8} max={8} step={1} />
+      </div>
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-medium">{$t("rsm.trimYaw")}</span>
+          <span class="text-[11px] text-muted-foreground tabular-nums">{$profile.gyroBiasYaw}</span>
+        </div>
+        <Slider type="single" value={$profile.gyroBiasYaw} onValueChange={updateBiasYaw} min={-8} max={8} step={1} />
+      </div>
+      <p class="text-[11px] text-muted-foreground">{$t("rsm.trimHint")}</p>
     </div>
   </section>
 {/if}

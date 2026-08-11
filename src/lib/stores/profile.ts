@@ -60,6 +60,11 @@ export interface Profile {
   hideCursor: boolean;
   /** Which virtual controller to emulate (Xbox 360 or DualShock 4) */
   controllerType: ControllerType;
+  /** DS4 gyro rest-offset compensation in raw LSB (16 LSB = 1 °/s):
+   * pre-added so readers that subtract their own assumed bias see exactly
+   * 0 °/s at rest. Defaults match the ViGEmBus calibration blob (pitch 1). */
+  gyroBiasPitch: number;
+  gyroBiasYaw: number;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -147,6 +152,8 @@ function defaultProfile(): Profile {
     captureToggleKey: "F1",
     hideCursor: true,
     controllerType: "xbox360",
+    gyroBiasPitch: 1,
+    gyroBiasYaw: 0,
   };
 }
 

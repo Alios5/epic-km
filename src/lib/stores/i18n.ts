@@ -80,6 +80,10 @@ const fr = {
   "rsm.gyroscope": "Gyroscope",
   "rsm.analogHint": "La vitesse de la souris pilote l'axe — revient à zéro quand la souris s'arrête.",
   "rsm.gyroHint": "La souris pilote le gyroscope de la DS4 (visée gyroscopique) — le stick reste centré.",
+  "rsm.trimTitle": "Compensation de dérive du gyroscope",
+  "rsm.trimPitch": "Pitch (haut/bas)",
+  "rsm.trimYaw": "Lacet (gauche/droite)",
+  "rsm.trimHint": "Si la visée dérive alors que la souris est immobile : augmentez le pitch si elle monte, diminuez-le si elle descend (1 pas ≈ 0,06 °/s).",
   // Key capture input
   "keycap.press": "Appuyez sur une touche…",
   // Assignment popover
@@ -212,6 +216,10 @@ const en: Record<MessageKey, string> = {
   "rsm.gyroscope": "Gyroscope",
   "rsm.analogHint": "Mouse velocity drives the axis — snaps back to zero when the mouse stops.",
   "rsm.gyroHint": "The mouse drives the DS4 gyroscope (motion aiming) — the stick stays centered.",
+  "rsm.trimTitle": "Gyro drift compensation",
+  "rsm.trimPitch": "Pitch (up/down)",
+  "rsm.trimYaw": "Yaw (left/right)",
+  "rsm.trimHint": "If the aim still drifts while the mouse is still: raise pitch if it climbs, lower it if it sinks (1 step ≈ 0.06 °/s).",
   "keycap.press": "Press a key…",
   "pop.currentKey": "Current key:",
   "pop.none": "None",
