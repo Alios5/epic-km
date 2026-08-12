@@ -24,6 +24,9 @@ export type AxisInputMode = "analog" | "gyroscope";
 
 export type ControllerType = "xbox360" | "ds4";
 
+/** Which axis the DS4 accelerometer reports as 1 g at rest (see profile.rs). */
+export type GyroRestAccel = "neg_y" | "pos_y" | "neg_z" | "pos_z" | "zero";
+
 export interface KeyboardStickMapping {
   id: string;
   key: string;
@@ -65,6 +68,8 @@ export interface Profile {
    * 0 °/s at rest. Defaults match the ViGEmBus calibration blob (pitch 1). */
   gyroBiasPitch: number;
   gyroBiasYaw: number;
+  /** Rest gravity axis for the DS4 accelerometer (horizon-correction input). */
+  gyroRestAccel: GyroRestAccel;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -154,6 +159,7 @@ function defaultProfile(): Profile {
     controllerType: "xbox360",
     gyroBiasPitch: 1,
     gyroBiasYaw: 0,
+    gyroRestAccel: "neg_y",
   };
 }
 
