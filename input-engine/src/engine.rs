@@ -518,34 +518,50 @@ fn emission_thread(state: Arc<EngineState>) {
                     // it — "mouse still" then reads as exactly 0 °/s. The
                     // trims are profile settings (defaults match ViGEmBus's
                     // calibration blob: pitch 1, yaw 0).
-                    let (bias_pitch, bias_yaw, rest_accel) = {
+                    let (bias_pitch, bias_yaw, rest_accel, dsu_enabled) = {
                         let p = state.profile.lock();
                         (
                             p.gyro_bias_pitch as i16,
                             p.gyro_bias_yaw as i16,
                             p.gyro_rest_accel,
+                            p.dsu_enabled,
                         )
                     };
-                    report.gyro_x = gamepad_state.gyro_pitch.saturating_add(bias_pitch);
-                    report.gyro_y = gamepad_state.gyro_yaw.saturating_add(bias_yaw);
-                    report.gyro_z = 0;
-                    // Rest gravity vector (1 g). Games fuse it with the gyro
-                    // for horizon correction and the expected axis depends
-                    // on the reader stack — see GyroRestAccel. If the reader
-                    // expects a different axis than the one we send, its
-                    // correction pulls the aim continuously (a drift the
-                    // gyro trims cannot cancel). Default −Y matches real
-                    // DS4 hardware.
-                    let (ax, ay, az) = match rest_accel {
-                        GyroRestAccel::NegY => (0, -8192, 0),
-                        GyroRestAccel::PosY => (0, 8192, 0),
-                        GyroRestAccel::NegZ => (0, 0, -8192),
-                        GyroRestAccel::PosZ => (0, 0, 8192),
-                        GyroRestAccel::Zero => (0, 0, 0),
-                    };
-                    report.accel_x = ax;
-                    report.accel_y = ay;
-                    report.accel_z = az;
+                    if dsu_enabled {
+                        // Motion is served over DSU (UDP 26760): neutralize the
+                        // HID motion channels so only one motion source ever
+                        // reaches the reader. Gyro carries only the reader's
+                        // assumed bias (reads as exactly 0 °/s after its
+                        // calibration); a zero accelerometer keeps any
+                        // horizon-correction fusion disabled.
+                        report.gyro_x = bias_pitch;
+                        report.gyro_y = bias_yaw;
+                        report.gyro_z = 0;
+                        report.accel_x = 0;
+                        report.accel_y = 0;
+                        report.accel_z = 0;
+                    } else {
+                        report.gyro_x = gamepad_state.gyro_pitch.saturating_add(bias_pitch);
+                        report.gyro_y = gamepad_state.gyro_yaw.saturating_add(bias_yaw);
+                        report.gyro_z = 0;
+                        // Rest gravity vector (1 g). Games fuse it with the gyro
+                        // for horizon correction and the expected axis depends
+                        // on the reader stack — see GyroRestAccel. If the reader
+                        // expects a different axis than the one we send, its
+                        // correction pulls the aim continuously (a drift the
+                        // gyro trims cannot cancel). Default −Y matches real
+                        // DS4 hardware.
+                        let (ax, ay, az) = match rest_accel {
+                            GyroRestAccel::NegY => (0, -8192, 0),
+                            GyroRestAccel::PosY => (0, 8192, 0),
+                            GyroRestAccel::NegZ => (0, 0, -8192),
+                            GyroRestAccel::PosZ => (0, 0, 8192),
+                            GyroRestAccel::Zero => (0, 0, 0),
+                        };
+                        report.accel_x = ax;
+                        report.accel_y = ay;
+                        report.accel_z = az;
+                    }
 
                     if let Err(e) = t.update_ex(&report) {
                         // ERROR_NO_MORE_ITEMS (259) is expected, not a
