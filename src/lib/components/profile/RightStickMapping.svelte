@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as Select from "$lib/components/ui/select/index.js";
   import { Slider } from "$lib/components/ui/slider/index.js";
+  import { Checkbox } from "$lib/components/ui/checkbox/index.js";
   import { profile, markDirty, type AxisInputMode, type GyroRestAccel } from "$lib/stores/profile";
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
@@ -42,6 +43,12 @@
 
   function updateRestAccel(v: GyroRestAccel) {
     profile.update((p) => ({ ...p, gyroRestAccel: v }));
+    markDirty();
+    pushToEngine();
+  }
+
+  function updateDsuEnabled(checked: boolean) {
+    profile.update((p) => ({ ...p, dsuEnabled: checked }));
     markDirty();
     pushToEngine();
   }
@@ -91,6 +98,17 @@
       <p class="text-[11px] text-muted-foreground">
         {$profile.rightStickYMode === "analog" ? $t("rsm.analogHint") : $t("rsm.gyroHint")}
       </p>
+    </div>
+
+    <!-- DSU (Cemuhook) motion server: streams the gyro as plain floats over
+         UDP 26760 — no HID calibration involved, so no rest drift. The
+         trim/gravity settings below only affect the HID path. -->
+    <div class="space-y-1.5 pt-1 border-t border-border">
+      <div class="flex items-center justify-between">
+        <label for="dsu-enable" class="text-xs font-medium cursor-pointer select-none">{$t("rsm.dsuEnable")}</label>
+        <Checkbox id="dsu-enable" checked={$profile.dsuEnabled} onCheckedChange={updateDsuEnabled} />
+      </div>
+      <p class="text-[11px] text-muted-foreground">{$t("rsm.dsuHint")}</p>
     </div>
 
     <!-- Gyro drift compensation: rest-offset trims (raw LSB) letting the

@@ -91,6 +91,8 @@ const fr = {
     "rsm.restAccelPosZ": "+Z",
     "rsm.restAccelZero": "Aucune (0, 0, 0)",
     "rsm.restAccelHint": "Si la dérive ignore le trim pitch : testez chaque orientation, souris immobile — celle qui fige la visée correspond à votre lecteur. « Aucune » désactive la correction d'horizon de la plupart des jeux.",
+    "rsm.dsuEnable": "Serveur de motion DSU (Cemuhook)",
+    "rsm.dsuHint": "Diffuse le gyroscope en UDP (port 26760), lu directement par l'émulateur : aucune calibration HID, donc aucune dérive au repos. Même réglage que pour pad-motion dans l'émulateur (motion via serveur DSU) — fermez pad-motion avant d'activer. Les trims/gravité ci-dessous ne concernent que le chemin HID.",
   // Key capture input
   "keycap.press": "Appuyez sur une touche…",
   // Assignment popover
@@ -234,6 +236,8 @@ const en: Record<MessageKey, string> = {
     "rsm.restAccelPosZ": "+Z",
     "rsm.restAccelZero": "None (0, 0, 0)",
     "rsm.restAccelHint": "If the drift ignores the pitch trim: try each orientation with the mouse still — the one that freezes the aim matches your reader. 'None' disables most games' horizon correction.",
+    "rsm.dsuEnable": "DSU motion server (Cemuhook)",
+    "rsm.dsuHint": "Streams the gyroscope over UDP (port 26760), read straight by the emulator: no HID calibration, so no rest drift. Same emulator setup as for pad-motion (motion via DSU server) — close pad-motion before enabling. The trim/gravity settings below only affect the HID path.",
   "keycap.press": "Press a key…",
   "pop.currentKey": "Current key:",
   "pop.none": "None",

@@ -15,6 +15,9 @@ pub type LogCallback = Box<dyn Fn(&str) + Send + Sync + 'static>;
 /// Shared engine state between capture and emission threads.
 pub struct EngineState {
     pub raw_input: Mutex<RawInputState>,
+    /// Latest mapped gamepad state, mirrored each emission tick for the DSU
+    /// motion server (UDP path) — pre-bias gyro values.
+    pub gamepad: Mutex<GamepadState>,
     pub profile: Mutex<Profile>,
     pub running: AtomicBool,
     pub capture_mode_active: AtomicBool,
@@ -57,6 +60,7 @@ fn init_watcher_inner(profile: Profile, _lock: parking_lot::MutexGuard<'_, ()>) 
 
         let state = Arc::new(EngineState {
             raw_input: Mutex::new(RawInputState::default()),
+            gamepad: Mutex::new(GamepadState::default()),
             profile: Mutex::new(profile),
             running: AtomicBool::new(true),
             capture_mode_active: AtomicBool::new(false),
@@ -80,6 +84,13 @@ fn init_watcher_inner(profile: Profile, _lock: parking_lot::MutexGuard<'_, ()>) 
         let state_clone = ENGINE.clone().unwrap();
         thread::spawn(move || {
             emission_thread(state_clone);
+        });
+
+        // Start the DSU (Cemuhook) motion server thread — idles until the
+        // profile enables it, then serves motion over UDP 26760.
+        let state_clone = ENGINE.clone().unwrap();
+        thread::spawn(move || {
+            crate::dsu::dsu_thread(state_clone);
         });
     }
 
@@ -198,7 +209,7 @@ pub fn toggle_capture_mode() {
 }
 
 /// Log a message to stdout and forward it to the UI log callback (if any).
-fn elog(state: &EngineState, msg: &str) {
+pub(crate) fn elog(state: &EngineState, msg: &str) {
     println!("[input-engine] {}", msg);
     if let Some(cb) = state.log_callback.lock().as_ref() {
         cb(msg);
@@ -431,6 +442,8 @@ fn emission_thread(state: Arc<EngineState>) {
                     GamepadState::default()
                 }
             };
+            // Mirror the mapped state for the DSU motion server (UDP path).
+            *state.gamepad.lock() = gamepad_state;
 
             // Center cursor when capture mode is active
             #[cfg(target_os = "windows")]

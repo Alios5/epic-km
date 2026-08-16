@@ -70,6 +70,9 @@ export interface Profile {
   gyroBiasYaw: number;
   /** Rest gravity axis for the DS4 accelerometer (horizon-correction input). */
   gyroRestAccel: GyroRestAccel;
+  /** Serve motion over Cemuhook/DSU (UDP 26760): emulators read the gyro as
+   * plain floats, bypassing HID calibration entirely (no rest drift). */
+  dsuEnabled: boolean;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -160,6 +163,7 @@ function defaultProfile(): Profile {
     gyroBiasPitch: 1,
     gyroBiasYaw: 0,
     gyroRestAccel: "neg_y",
+    dsuEnabled: false,
   };
 }
 

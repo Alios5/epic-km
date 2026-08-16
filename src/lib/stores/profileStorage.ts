@@ -33,6 +33,7 @@ export async function loadProfile(name: string): Promise<Profile> {
     gyroBiasPitch: data.gyroBiasPitch ?? 1,
     gyroBiasYaw: data.gyroBiasYaw ?? 0,
     gyroRestAccel: data.gyroRestAccel ?? "neg_y",
+    dsuEnabled: data.dsuEnabled ?? false,
     leftStick: normalizeStick(data.leftStick, 0.0),
     rightStick: normalizeStick(data.rightStick, 0.3),
   };

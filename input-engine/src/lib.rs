@@ -2,6 +2,7 @@ pub mod profile;
 pub mod mapping;
 pub mod keycode;
 pub mod engine;
+pub mod dsu;
 
 #[cfg(target_os = "windows")]
 mod windows_capture;

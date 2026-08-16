@@ -168,6 +168,11 @@ pub struct Profile {
     /// GyroRestAccel). serde default keeps older profile files valid (−Y).
     #[serde(default)]
     pub gyro_rest_accel: GyroRestAccel,
+    /// Serve motion over the Cemuhook/DSU protocol (UDP 26760) in addition
+    /// to the HID report — emulators reading gyro this way get plain floats
+    /// and skip the whole HID calibration stack (no rest drift).
+    #[serde(default)]
+    pub dsu_enabled: bool,
 }
 
 impl Default for Profile {
@@ -206,6 +211,7 @@ impl Default for Profile {
             gyro_bias_pitch: 1,
             gyro_bias_yaw: 0,
             gyro_rest_accel: GyroRestAccel::NegY,
+            dsu_enabled: false,
         }
     }
 }
