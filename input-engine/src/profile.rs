@@ -105,6 +105,13 @@ fn default_hide_cursor() -> bool {
     true
 }
 
+/// DSU gravity defaults to on: the constant (0, 9.81, 0) rest vector is
+/// what pad-motion proved against Ryujinx, and some games ignore motion
+/// entirely without a plausible accelerometer.
+fn default_dsu_gravity() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StickConfig {
@@ -173,6 +180,12 @@ pub struct Profile {
     /// and skip the whole HID calibration stack (no rest drift).
     #[serde(default)]
     pub dsu_enabled: bool,
+    /// Include the constant rest-gravity vector in the DSU stream. Turn it
+    /// off when the game's horizon fusion fights the mouse (aim climbs at
+    /// rest, resists when aiming down) — pure gyro leaves it nothing to
+    /// fuse against.
+    #[serde(default = "default_dsu_gravity")]
+    pub dsu_gravity: bool,
 }
 
 impl Default for Profile {
@@ -212,6 +225,7 @@ impl Default for Profile {
             gyro_bias_yaw: 0,
             gyro_rest_accel: GyroRestAccel::NegY,
             dsu_enabled: false,
+            dsu_gravity: true,
         }
     }
 }

@@ -52,6 +52,12 @@
     markDirty();
     pushToEngine();
   }
+
+  function updateDsuGravity(checked: boolean) {
+    profile.update((p) => ({ ...p, dsuGravity: checked }));
+    markDirty();
+    pushToEngine();
+  }
 </script>
 
 <!-- Gyroscope axis modes only exist for the DS4 target (an XUSB pad has
@@ -108,7 +114,12 @@
         <label for="dsu-enable" class="text-xs font-medium cursor-pointer select-none">{$t("rsm.dsuEnable")}</label>
         <Checkbox id="dsu-enable" checked={$profile.dsuEnabled} onCheckedChange={updateDsuEnabled} />
       </div>
+      <div class="flex items-center justify-between">
+        <label for="dsu-gravity" class="text-xs font-medium cursor-pointer select-none">{$t("rsm.dsuGravity")}</label>
+        <Checkbox id="dsu-gravity" checked={$profile.dsuGravity} onCheckedChange={updateDsuGravity} />
+      </div>
       <p class="text-[11px] text-muted-foreground">{$t("rsm.dsuHint")}</p>
+      <p class="text-[11px] text-muted-foreground">{$t("rsm.dsuGravityHint")}</p>
     </div>
 
     <!-- Gyro drift compensation: rest-offset trims (raw LSB) letting the

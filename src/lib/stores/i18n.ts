@@ -92,6 +92,8 @@ const fr = {
     "rsm.restAccelZero": "Aucune (0, 0, 0)",
     "rsm.restAccelHint": "Si la dérive ignore le trim pitch : testez chaque orientation, souris immobile — celle qui fige la visée correspond à votre lecteur. « Aucune » désactive la correction d'horizon de la plupart des jeux.",
     "rsm.dsuEnable": "Serveur de motion DSU (Cemuhook)",
+    "rsm.dsuGravity": "Gravité DSU (accéléromètre)",
+    "rsm.dsuGravityHint": "Décochez si la visée remonte toute seule ou résiste quand vous visez vers le bas : la correction d'horizon du jeu réagit à la gravité constante. Sans gravité, le jeu suit le gyroscope pur.",
     "rsm.dsuHint": "Diffuse le gyroscope en UDP (port 26760) : tant que cette option est active, la motion HID de la DS4 est neutralisée — une seule source de motion atteint le jeu. Dans Ryujinx : Options → Paramètres → Entrées → Motion → « Use CemuHook compatible motion » (serveur 127.0.0.1, port 26760). Fermez pad-motion avant d'activer. Le log doit afficher « DSU client connected » — sinon l'émulateur ne lit pas le serveur.",
   // Key capture input
   "keycap.press": "Appuyez sur une touche…",
@@ -237,6 +239,8 @@ const en: Record<MessageKey, string> = {
     "rsm.restAccelZero": "None (0, 0, 0)",
     "rsm.restAccelHint": "If the drift ignores the pitch trim: try each orientation with the mouse still — the one that freezes the aim matches your reader. 'None' disables most games' horizon correction.",
     "rsm.dsuEnable": "DSU motion server (Cemuhook)",
+    "rsm.dsuGravity": "DSU gravity (accelerometer)",
+    "rsm.dsuGravityHint": "Uncheck if the aim climbs by itself or resists when you aim down: the game's horizon correction reacts to the constant gravity. Without gravity, the game follows the pure gyroscope.",
     "rsm.dsuHint": "Streams the gyroscope over UDP (port 26760): while enabled, the DS4's HID motion is neutralized — only one motion source ever reaches the game. In Ryujinx: Options → Settings → Input → Motion → 'Use CemuHook compatible motion' (server 127.0.0.1, port 26760). Close pad-motion before enabling. The log must show 'DSU client connected' — otherwise the emulator isn't reading the server.",
   "keycap.press": "Press a key…",
   "pop.currentKey": "Current key:",

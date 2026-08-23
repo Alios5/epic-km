@@ -105,13 +105,14 @@ fn serve(state: &Arc<EngineState>, socket: &UdpSocket) {
             subscribers.retain(|_, s| s.last_seen.elapsed() < CLIENT_TIMEOUT);
             if !subscribers.is_empty() {
                 let gamepad = *state.gamepad.lock();
+                let gravity = state.profile.lock().dsu_gravity;
                 let timestamp = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .map(|d| d.as_micros() as u64)
                     .unwrap_or(0);
                 for (addr, sub) in subscribers.iter_mut() {
                     sub.packet_number = sub.packet_number.wrapping_add(1);
-                    let packet = build_data_packet(&gamepad, sub.packet_number, timestamp);
+                    let packet = build_data_packet(&gamepad, sub.packet_number, timestamp, gravity);
                     let _ = socket.send_to(&packet, addr);
                 }
             }
@@ -196,7 +197,15 @@ fn handle_packet(
 /// gamepad (buttons/sticks included, so full-DSU clients like Dolphin could
 /// use it as-is); the gyroscope is converted from DS4 raw units to °/s with
 /// no rest-offset trim — the DSU path has no calibration blob to compensate.
-fn build_data_packet(gamepad: &GamepadState, packet_number: u32, timestamp_us: u64) -> Vec<u8> {
+/// `gravity` controls the rest accelerometer: some games fuse it with the
+/// gyro for horizon correction, which fights a mouse (aim climbs at rest,
+/// resists when aiming down) — sending zeroes leaves them pure gyro.
+fn build_data_packet(
+    gamepad: &GamepadState,
+    packet_number: u32,
+    timestamp_us: u64,
+    gravity: bool,
+) -> Vec<u8> {
     let b = &gamepad.buttons;
     let buttons_1 = (b.dpad_left as u8) << 7
         | (b.dpad_down as u8) << 6
@@ -254,7 +263,8 @@ fn build_data_packet(gamepad: &GamepadState, packet_number: u32, timestamp_us: u
     payload.extend_from_slice(&timestamp_us.to_le_bytes());
     // Rest gravity + gyro rates (deg/s). Signs match pad-motion's proven
     // mapping: mouse right → +yaw, mouse up → +pitch.
-    for v in [0.0f32, 9.81, 0.0] {
+    let accel = if gravity { [0.0f32, 9.81, 0.0] } else { [0.0; 3] };
+    for v in accel {
         payload.extend_from_slice(&v.to_le_bytes());
     }
     let gyro_pitch = gamepad.gyro_pitch as f32 / DS4_GYRO_LSB_PER_DPS;

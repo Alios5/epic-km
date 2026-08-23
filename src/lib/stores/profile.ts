@@ -73,6 +73,10 @@ export interface Profile {
   /** Serve motion over Cemuhook/DSU (UDP 26760): emulators read the gyro as
    * plain floats, bypassing HID calibration entirely (no rest drift). */
   dsuEnabled: boolean;
+  /** Include the constant rest-gravity vector in the DSU stream. Turn off
+   * when the game's horizon fusion fights the mouse (aim climbs at rest,
+   * resists when aiming down). */
+  dsuGravity: boolean;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -164,6 +168,7 @@ function defaultProfile(): Profile {
     gyroBiasYaw: 0,
     gyroRestAccel: "neg_y",
     dsuEnabled: false,
+    dsuGravity: true,
   };
 }
 
