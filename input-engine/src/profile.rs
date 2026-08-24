@@ -65,36 +65,6 @@ fn default_controller_type() -> ControllerType {
     ControllerType::Xbox360
 }
 
-/// Which axis the DS4's accelerometer reports as 1 g when the virtual
-/// controller is at rest. Games fuse this gravity vector with the gyro for
-/// horizon correction, and the convention they expect depends on the reader
-/// stack (SDL/Ryujinx, DSU servers, Cemu...). `NegY` matches real DS4
-/// hardware (a genuine unit lying level reads ≈ (0, −8060, 0)), so it's the
-/// default. If the aim drifts at rest while the gyro trims have no effect,
-/// the reader expects a different axis — switch until the view freezes.
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum GyroRestAccel {
-    /// Gravity on −Y (real DS4 convention).
-    #[default]
-    NegY,
-    /// Gravity on +Y (inverted).
-    PosY,
-    /// Gravity on −Z.
-    NegZ,
-    /// Gravity on +Z.
-    PosZ,
-    /// No gravity at all (0, 0, 0) — most games disable their gravity
-    /// fusion when the acceleration magnitude isn't ~1 g.
-    Zero,
-}
-
-/// Default DS4 gyro pitch rest-offset (raw LSB): the bias declared by
-/// ViGEmBus's hardcoded calibration blob (feature report 0x02).
-fn default_gyro_bias_pitch() -> i32 {
-    1
-}
-
 /// Default per-axis sensitivity multiplier (neutral).
 fn default_axis_sensitivity() -> f64 {
     1.0
@@ -161,20 +131,6 @@ pub struct Profile {
     /// serde default keeps older profile files valid (Xbox 360).
     #[serde(default = "default_controller_type")]
     pub controller_type: ControllerType,
-    /// Rest-offset compensation added to the DS4 gyroscope channels, in raw
-    /// LSB (16 LSB = 1 °/s). Every motion reader subtracts its own assumed
-    /// gyro bias (SDL uses the ViGEmBus calibration blob: pitch bias = 1),
-    /// so we pre-add it — a perfectly still mouse then reads as exactly
-    /// 0 °/s instead of drifting forever. Pitch defaults to 1 (the blob),
-    /// yaw to 0; adjust only if the aim still drifts at rest.
-    #[serde(default = "default_gyro_bias_pitch")]
-    pub gyro_bias_pitch: i32,
-    #[serde(default)]
-    pub gyro_bias_yaw: i32,
-    /// Accelerometer gravity vector reported while at rest (see
-    /// GyroRestAccel). serde default keeps older profile files valid (−Y).
-    #[serde(default)]
-    pub gyro_rest_accel: GyroRestAccel,
     /// Serve motion over the Cemuhook/DSU protocol (UDP 26760) in addition
     /// to the HID report — emulators reading gyro this way get plain floats
     /// and skip the whole HID calibration stack (no rest drift).
@@ -221,9 +177,6 @@ impl Default for Profile {
             capture_toggle_key: "F1".to_string(),
             hide_cursor: true,
             controller_type: ControllerType::Xbox360,
-            gyro_bias_pitch: 1,
-            gyro_bias_yaw: 0,
-            gyro_rest_accel: GyroRestAccel::NegY,
             dsu_enabled: false,
             dsu_gravity: true,
         }

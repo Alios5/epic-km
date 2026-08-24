@@ -55,6 +55,11 @@ pub struct RawInputState {
     pub smooth_ry: f64,
     pub smooth_lx: f64,
     pub smooth_ly: f64,
+    /// Previous smoothed gyro outputs (EMA filter, Gyroscope mode)
+    pub smooth_gyro_yaw: f64,
+    pub smooth_gyro_pitch: f64,
+    /// Accumulated pitch for soft-limit + auto-recentering (anti-flip)
+    pub pitch_accum: f64,
 }
 
 /// Stick fraction produced per pixel/second of mouse speed at sensitivity 1.0.
@@ -72,6 +77,20 @@ const GYRO_DEG_PER_PX: f64 = 0.05;
 /// defaults every reader falls back to (Linux hid-playstation:
 /// DS4_GYRO_RES_PER_DEG_S; SDL: gyro_numerator/denominator = 1/16).
 const DS4_GYRO_LSB_PER_DPS: f64 = 16.0;
+
+/// Mouse deadzone in raw pixels: micro-movements below this are ignored to
+/// eliminate sensor noise that would otherwise produce a constant non-zero
+/// gyro rate → drift. Mirrors pad-motion's approach.
+const GYRO_MOUSE_DEADZONE: f64 = 2.0;
+
+/// Soft limit on accumulated pitch (same arbitrary units as gyro_pitch).
+/// Prevents the "flip" when the emulator's integrated tilt passes ~90°.
+const PITCH_LIMIT: f64 = 300.0;
+
+/// Auto-recentering rate for accumulated pitch: when the mouse is still
+/// vertically, pitch_accum decays toward 0 at this rate per second.
+/// 0 = disabled. Mirrors pad-motion's pitch_recenter.
+const PITCH_RECENTER_RATE: f64 = 0.15;
 
 /// Exponential smoothing towards the target, independent of the polling rate.
 /// `amount` (0.0 = off .. 0.95) maps to a time constant of amount * 0.25 s.
@@ -148,17 +167,23 @@ fn process_axis_analog(
 /// delta of this tick into a DS4 gyroscope angular rate, in raw units
 /// (16 LSB per °/s). When the mouse stops the rate is zero — like a real
 /// gyroscope, which only reports while the controller is rotating.
+/// A deadzone on raw pixels eliminates sensor noise that would otherwise
+/// produce a constant non-zero gyro rate (the main cause of drift).
 fn process_axis_gyro(
     raw_pixels: f64,
     sensitivity: f64,
     axis_sensitivity: f64,
     invert: bool,
     hz: f64,
-) -> i16 {
+) -> f64 {
+    // Deadzone: ignore micro-movements (sensor noise / sub-pixel jitter)
+    if raw_pixels.abs() < GYRO_MOUSE_DEADZONE {
+        return 0.0;
+    }
     let mut degrees = raw_pixels * GYRO_DEG_PER_PX * sensitivity * axis_sensitivity;
     if invert { degrees = -degrees; }
     let dps = degrees * hz;
-    (dps * DS4_GYRO_LSB_PER_DPS).clamp(i16::MIN as f64, i16::MAX as f64) as i16
+    dps * DS4_GYRO_LSB_PER_DPS
 }
 
 /// Applies stick processing: global + per-axis sensitivity, deadzone, curve,
@@ -280,13 +305,19 @@ pub fn map_input(
         AxisInputMode::Gyroscope => {
             // Mouse X drives the DS4's yaw gyroscope channel (report
             // gyro_y); the stick axis itself stays centered.
-            state.gyro_yaw = process_axis_gyro(
+            let target_yaw = process_axis_gyro(
                 raw_dx,
                 profile.right_stick.sensitivity,
                 profile.right_stick.sensitivity_x,
                 profile.right_stick.invert_x,
                 hz,
             );
+            // EMA smoothing (framerate-independent): eliminates jitter
+            // from bursty OS mouse delivery without adding latency.
+            let sm = profile.right_stick.smoothing;
+            let alpha = if sm > 0.0 { 1.0 - sm.powf(dt / (1.0 / hz)) } else { 1.0 };
+            input.smooth_gyro_yaw += (target_yaw - input.smooth_gyro_yaw) * alpha;
+            state.gyro_yaw = input.smooth_gyro_yaw.clamp(i16::MIN as f64, i16::MAX as f64) as i16;
             0.0
         }
     };
@@ -310,13 +341,31 @@ pub fn map_input(
             // gyro_x). On a real DS4 a positive pitch rate is the nose
             // tilting up, while mouse-up arrives as negative deltas —
             // hence the sign flip (invert_y flips it back if needed).
-            state.gyro_pitch = process_axis_gyro(
+            let mut target_pitch = process_axis_gyro(
                 -raw_dy,
                 profile.right_stick.sensitivity,
                 profile.right_stick.sensitivity_y,
                 profile.right_stick.invert_y,
                 hz,
             );
+            // Soft pitch limit + auto-recentering (anti-flip, anti-drift):
+            // the emulator integrates gyro_pitch to track tilt. If it
+            // passes ~90°, yaw/pitch swap (the classic Wiimote flip).
+            // We track pitch_accum and: (1) stop pushing past the limit,
+            // (2) decay toward 0 when the mouse is still vertically.
+            let projected = input.pitch_accum + target_pitch * dt;
+            if projected.abs() > PITCH_LIMIT && projected.signum() == target_pitch.signum() {
+                target_pitch = 0.0;
+            }
+            input.pitch_accum = (input.pitch_accum + target_pitch * dt).clamp(-PITCH_LIMIT, PITCH_LIMIT);
+            if PITCH_RECENTER_RATE > 0.0 {
+                input.pitch_accum *= (1.0 - PITCH_RECENTER_RATE * dt).max(0.0);
+            }
+            // EMA smoothing (same as yaw)
+            let sm = profile.right_stick.smoothing;
+            let alpha = if sm > 0.0 { 1.0 - sm.powf(dt / (1.0 / hz)) } else { 1.0 };
+            input.smooth_gyro_pitch += (target_pitch - input.smooth_gyro_pitch) * alpha;
+            state.gyro_pitch = input.smooth_gyro_pitch.clamp(i16::MIN as f64, i16::MAX as f64) as i16;
             0.0
         }
     };

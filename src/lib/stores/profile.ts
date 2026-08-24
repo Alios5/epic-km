@@ -24,9 +24,6 @@ export type AxisInputMode = "analog" | "gyroscope";
 
 export type ControllerType = "xbox360" | "ds4";
 
-/** Which axis the DS4 accelerometer reports as 1 g at rest (see profile.rs). */
-export type GyroRestAccel = "neg_y" | "pos_y" | "neg_z" | "pos_z" | "zero";
-
 export interface KeyboardStickMapping {
   id: string;
   key: string;
@@ -63,13 +60,6 @@ export interface Profile {
   hideCursor: boolean;
   /** Which virtual controller to emulate (Xbox 360 or DualShock 4) */
   controllerType: ControllerType;
-  /** DS4 gyro rest-offset compensation in raw LSB (16 LSB = 1 °/s):
-   * pre-added so readers that subtract their own assumed bias see exactly
-   * 0 °/s at rest. Defaults match the ViGEmBus calibration blob (pitch 1). */
-  gyroBiasPitch: number;
-  gyroBiasYaw: number;
-  /** Rest gravity axis for the DS4 accelerometer (horizon-correction input). */
-  gyroRestAccel: GyroRestAccel;
   /** Serve motion over Cemuhook/DSU (UDP 26760): emulators read the gyro as
    * plain floats, bypassing HID calibration entirely (no rest drift). */
   dsuEnabled: boolean;
@@ -164,9 +154,6 @@ function defaultProfile(): Profile {
     captureToggleKey: "F1",
     hideCursor: true,
     controllerType: "xbox360",
-    gyroBiasPitch: 1,
-    gyroBiasYaw: 0,
-    gyroRestAccel: "neg_y",
     dsuEnabled: false,
     dsuGravity: true,
   };

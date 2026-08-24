@@ -8,8 +8,10 @@
 //! issues seen on the ViGEmBus → SDL path.
 //!
 //! Protocol reference: <https://v1993.github.io/cemuhook-protocol/>
-//! Gyroscope values are in deg/s, accelerometer in g's. The rest gravity
-//! mirrors the values pad-motion proved against Ryujinx: (0, 9.81, 0).
+//! Gyroscope values are in deg/s, accelerometer in m/s².
+//! The rest gravity vector is (0, 9.81, 0) — one g on the Y axis.
+//! Drift is prevented by a mouse deadzone + EMA smoothing + pitch
+//! auto-recentering in mapping.rs, not by manipulating gravity.
 
 use crate::engine::{elog, EngineState};
 use crate::mapping::GamepadState;
@@ -198,8 +200,9 @@ fn handle_packet(
 /// use it as-is); the gyroscope is converted from DS4 raw units to °/s with
 /// no rest-offset trim — the DSU path has no calibration blob to compensate.
 /// `gravity` controls the rest accelerometer: some games fuse it with the
-/// gyro for horizon correction, which fights a mouse (aim climbs at rest,
-/// resists when aiming down) — sending zeroes leaves them pure gyro.
+/// gyro for horizon correction. With the mouse deadzone + EMA smoothing
+/// in mapping.rs, the gyro reads exactly 0 at rest, so gravity fusion no
+/// longer causes drift. Sending zeroes leaves the game pure-gyro.
 fn build_data_packet(
     gamepad: &GamepadState,
     packet_number: u32,
