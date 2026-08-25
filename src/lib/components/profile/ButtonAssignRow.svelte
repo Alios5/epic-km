@@ -10,14 +10,8 @@
 
   let { button, label }: Props = $props();
 
-  // In DS4 mode the real DualShock names (Croix, Rond, L1, Share…) win
-  // over the Xbox-flavored labels passed by the side panels.
+  // Button labels use the internal Xbox naming (A/B/X/Y, LB/RB, etc.).
   let displayLabel = $derived.by(() => {
-    if ($profile.controllerType === "ds4") {
-      const key = `btn.ds4.${button}` as MessageKey;
-      const name = $t(key);
-      if (name !== key) return name;
-    }
     return label ?? button;
   });
 </script>

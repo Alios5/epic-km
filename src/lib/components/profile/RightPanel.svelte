@@ -1,7 +1,6 @@
 <script lang="ts">
   import ButtonAssignRow from "$lib/components/profile/ButtonAssignRow.svelte";
-  import StickSettings from "$lib/components/profile/StickSettings.svelte";
-  import RightStickMapping from "$lib/components/profile/RightStickMapping.svelte";
+  import RightStickSettings from "$lib/components/profile/RightStickSettings.svelte";
   import { profile } from "$lib/stores/profile";
   import { t } from "$lib/stores/i18n";
   import GamepadIcon from "@lucide/svelte/icons/gamepad-2";
@@ -18,9 +17,9 @@
     </div>
   </div>
 
-  <!-- Section: Face buttons A/B/X/Y (Cross/Circle/Square/Triangle on DS4) -->
+  <!-- Section: Face buttons A/B/X/Y -->
   <div class="px-3 py-3 border-b border-border">
-    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{$profile.controllerType === "ds4" ? $t("panel.faceButtonsDs4") : $t("panel.faceButtons")}</h2>
+    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{$t("panel.faceButtons")}</h2>
     <div class="space-y-1.5">
       <ButtonAssignRow button="A" label="A" />
       <ButtonAssignRow button="B" label="B" />
@@ -37,8 +36,7 @@
     </div>
     <div class="space-y-3">
       <ButtonAssignRow button="RightThumb" label={$t("panel.stickClick")} />
-      <StickSettings stickKey="rightStick" />
-      <RightStickMapping />
+      <RightStickSettings />
     </div>
   </div>
 </aside>

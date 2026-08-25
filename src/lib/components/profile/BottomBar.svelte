@@ -2,8 +2,7 @@
   import { Slider } from "$lib/components/ui/slider/index.js";
   import { Button } from "$lib/components/ui/button/index.js";
   import { Checkbox } from "$lib/components/ui/checkbox/index.js";
-  import * as Select from "$lib/components/ui/select/index.js";
-  import { profile, markDirty, type ControllerType } from "$lib/stores/profile";
+  import { profile, markDirty } from "$lib/stores/profile";
   import KeyCaptureInput from "$lib/components/KeyCaptureInput.svelte";
   import { t } from "$lib/stores/i18n";
   import { invoke } from "@tauri-apps/api/core";
@@ -41,13 +40,6 @@
   function updateHideCursor(v: boolean) {
     markDirty();
     profile.update((p) => ({ ...p, hideCursor: v }));
-    pushToEngine();
-  }
-
-  function updateControllerType(v: string) {
-    if (v !== "xbox360" && v !== "ds4") return;
-    markDirty();
-    profile.update((p) => ({ ...p, controllerType: v as ControllerType }));
     pushToEngine();
   }
 </script>
@@ -94,23 +86,6 @@
   </div>
 
   <div class="h-5 w-px bg-border"></div>
-
-  <div class="flex items-center gap-2">
-    <span class="text-xs font-medium whitespace-nowrap">{$t("bottombar.controller")}</span>
-    <Select.Root
-      type="single"
-      value={$profile.controllerType}
-      onValueChange={(v) => v && updateControllerType(v)}
-    >
-      <Select.Trigger class="h-8 w-40 text-xs">
-        {$profile.controllerType === "ds4" ? $t("controller.ds4") : $t("controller.xbox360")}
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Item value="xbox360" label={$t("controller.xbox360")} />
-        <Select.Item value="ds4" label={$t("controller.ds4")} />
-      </Select.Content>
-    </Select.Root>
-  </div>
 
   <div class="ml-auto">
     <Button size="sm" onclick={onSave}>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as Select from "$lib/components/ui/select/index.js";
+  import { Slider } from "$lib/components/ui/slider/index.js";
   import { Checkbox } from "$lib/components/ui/checkbox/index.js";
   import { profile, markDirty, type AxisInputMode } from "$lib/stores/profile";
   import { invoke } from "@tauri-apps/api/core";
@@ -9,17 +10,17 @@
   function updateXMode(mode: AxisInputMode) {
     profile.update((p) => ({ ...p, rightStickXMode: mode }));
     markDirty();
-    invoke("reload_profile", { profile: get(profile) }).catch(() => {});
+    pushToEngine();
   }
 
   function updateYMode(mode: AxisInputMode) {
     profile.update((p) => ({ ...p, rightStickYMode: mode }));
     markDirty();
-    invoke("reload_profile", { profile: get(profile) }).catch(() => {});
+    pushToEngine();
   }
 
-  // Push the profile to the running engine (debounced) so DSU toggle
-  // changes apply live, without saving first
+  // Push the profile to the running engine (debounced) so slider changes
+  // and DSU toggles apply live, without saving first
   let pushTimer: ReturnType<typeof setTimeout> | null = null;
   function pushToEngine() {
     if (pushTimer) clearTimeout(pushTimer);
@@ -39,12 +40,50 @@
     markDirty();
     pushToEngine();
   }
+
+  function updateSensX(v: number) {
+    profile.update((p) => ({
+      ...p,
+      rightStick: { ...p.rightStick, sensitivityX: v },
+    }));
+    markDirty();
+    pushToEngine();
+  }
+
+  function updateSensY(v: number) {
+    profile.update((p) => ({
+      ...p,
+      rightStick: { ...p.rightStick, sensitivityY: v },
+    }));
+    markDirty();
+    pushToEngine();
+  }
+
+  function updateSmoothing(v: number) {
+    profile.update((p) => ({
+      ...p,
+      rightStick: { ...p.rightStick, smoothing: v },
+    }));
+    markDirty();
+    pushToEngine();
+  }
+
+  function updateAyLock(v: number) {
+    profile.update((p) => ({ ...p, gyroAyLock: v }));
+    markDirty();
+    pushToEngine();
+  }
+
+  function updateRecalibDelay(v: number) {
+    profile.update((p) => ({ ...p, gyroRecalibDelay: v }));
+    markDirty();
+    pushToEngine();
+  }
 </script>
 
 <!-- Gyroscope axis modes: the XUSB (Xbox 360) HID report has no motion
      channels, but the values still reach games via the DSU/Cemuhook UDP
-     server (independent of the virtual controller type), so this section
-     is available for both Xbox 360 and DS4. -->
+     server, so this section is available for the Xbox 360 controller. -->
 <section class="space-y-3">
     <!-- X axis mode selector -->
     <div class="space-y-1.5">
@@ -65,6 +104,15 @@
       <p class="text-[11px] text-muted-foreground">
         {$profile.rightStickXMode === "analog" ? $t("rsm.analogHint") : $t("rsm.gyroHint")}
       </p>
+      {#if $profile.rightStickXMode === "gyroscope"}
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium">{$t("rsm.gyroSensX")}</span>
+            <span class="text-[11px] text-muted-foreground tabular-nums">{$profile.rightStick.sensitivityX.toFixed(2)}</span>
+          </div>
+          <Slider type="single" value={$profile.rightStick.sensitivityX} onValueChange={updateSensX} min={0.1} max={10} step={0.1} />
+        </div>
+      {/if}
     </div>
 
     <!-- Y axis mode selector -->
@@ -86,11 +134,49 @@
       <p class="text-[11px] text-muted-foreground">
         {$profile.rightStickYMode === "analog" ? $t("rsm.analogHint") : $t("rsm.gyroHint")}
       </p>
+      {#if $profile.rightStickYMode === "gyroscope"}
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium">{$t("rsm.gyroSensY")}</span>
+            <span class="text-[11px] text-muted-foreground tabular-nums">{$profile.rightStick.sensitivityY.toFixed(2)}</span>
+          </div>
+          <Slider type="single" value={$profile.rightStick.sensitivityY} onValueChange={updateSensY} min={0.1} max={10} step={0.1} />
+        </div>
+      {/if}
     </div>
 
-    <!-- DSU (Cemuhook) motion server: streams the gyro as plain floats over
-         UDP 26760 — no HID calibration involved, so no rest drift. The
-         trim/gravity settings below only affect the HID path. -->
+    <!-- Shared gyro smoothing -->
+    {#if $profile.rightStickXMode === "gyroscope" || $profile.rightStickYMode === "gyroscope"}
+      <div class="space-y-1.5 border-t border-border pt-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium">{$t("rsm.gyroSmoothing")}</span>
+          <span class="text-xs text-muted-foreground tabular-nums">{Math.round($profile.rightStick.smoothing * 100)}%</span>
+        </div>
+        <Slider type="single" value={$profile.rightStick.smoothing} onValueChange={updateSmoothing} min={0} max={0.95} step={0.05} />
+      </div>
+    {/if}
+
+    <!-- Recalibration settings -->
+    {#if $profile.rightStickXMode === "gyroscope" || $profile.rightStickYMode === "gyroscope"}
+      <div class="space-y-2 border-t border-border pt-2">
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium">{$t("rsm.ayLock")}</span>
+            <span class="text-[11px] text-muted-foreground tabular-nums">{$profile.gyroAyLock.toFixed(2)}</span>
+          </div>
+          <Slider type="single" value={$profile.gyroAyLock} onValueChange={updateAyLock} min={-2.0} max={-1.0} step={0.01} />
+        </div>
+        <div class="space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-medium">{$t("rsm.recalibDelay")}</span>
+            <span class="text-[11px] text-muted-foreground tabular-nums">{$profile.gyroRecalibDelay.toFixed(1)}s</span>
+          </div>
+          <Slider type="single" value={$profile.gyroRecalibDelay} onValueChange={updateRecalibDelay} min={0} max={10} step={0.5} />
+        </div>
+      </div>
+    {/if}
+
+    <!-- DSU (Cemuhook) motion server -->
     <div class="space-y-1.5 pt-1 border-t border-border">
       <div class="flex items-center justify-between">
         <label for="dsu-enable" class="text-xs font-medium cursor-pointer select-none">{$t("rsm.dsuEnable")}</label>

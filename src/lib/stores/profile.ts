@@ -22,7 +22,7 @@ export type StickDirection = "up" | "down" | "left" | "right";
 
 export type AxisInputMode = "analog" | "gyroscope";
 
-export type ControllerType = "xbox360" | "ds4";
+export type ControllerType = "xbox360";
 
 export interface KeyboardStickMapping {
   id: string;
@@ -67,6 +67,11 @@ export interface Profile {
    * when the game's horizon fusion fights the mouse (aim climbs at rest,
    * resists when aiming down). */
   dsuGravity: boolean;
+  /** Anti-recalibration gravity offset sent during active play. */
+  gyroAyLock: number;
+  /** Seconds of mouse inactivity before the true flat gravity is sent;
+   * 0 disables natural recalibration. */
+  gyroRecalibDelay: number;
 }
 
 export const GAMEPAD_BUTTONS = [
@@ -151,6 +156,8 @@ function defaultProfile(): Profile {
       refreshInterval: 240,
     },
     triggerThreshold: 0.5,
+    gyroAyLock: -1.27,
+    gyroRecalibDelay: 3.0,
     captureToggleKey: "F1",
     hideCursor: true,
     controllerType: "xbox360",

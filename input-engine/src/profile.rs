@@ -51,14 +51,11 @@ fn default_axis_mode() -> AxisInputMode {
 
 /// Which virtual controller the engine exposes through ViGEmBus.
 /// `Xbox360`: XUSB pad — no motion sensors, but universally supported.
-/// `Ds4`: DualShock 4 — buttons/sticks identical, plus gyro/accelerometer
-/// channels driven by axes in Gyroscope mode.
+/// DS4 emulation was removed; motion is served exclusively over DSU.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum ControllerType {
     #[serde(rename = "xbox360")]
     Xbox360,
-    #[serde(rename = "ds4")]
-    Ds4,
 }
 
 fn default_controller_type() -> ControllerType {
@@ -80,6 +77,18 @@ fn default_hide_cursor() -> bool {
 /// entirely without a plausible accelerometer.
 fn default_dsu_gravity() -> bool {
     true
+}
+
+/// Anti-recalibration gravity offset during active play (prevents the
+/// emulator from snapping the current orientation as its new zero).
+fn default_gyro_ay_lock() -> f64 {
+    -1.27
+}
+
+/// Seconds of mouse inactivity before sending the true flat gravity,
+/// allowing the emulator to naturally recenter. 0 = never.
+fn default_gyro_recalib_delay() -> f64 {
+    3.0
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -131,6 +140,13 @@ pub struct Profile {
     /// serde default keeps older profile files valid (Xbox 360).
     #[serde(default = "default_controller_type")]
     pub controller_type: ControllerType,
+    /// Anti-recalibration gravity offset sent during active play.
+    #[serde(default = "default_gyro_ay_lock")]
+    pub gyro_ay_lock: f64,
+    /// Seconds of mouse inactivity before the true flat gravity is sent;
+    /// set to 0 to disable natural recalibration.
+    #[serde(default = "default_gyro_recalib_delay")]
+    pub gyro_recalib_delay: f64,
     /// Serve motion over the Cemuhook/DSU protocol (UDP 26760) in addition
     /// to the HID report — emulators reading gyro this way get plain floats
     /// and skip the whole HID calibration stack (no rest drift).
@@ -179,6 +195,8 @@ impl Default for Profile {
             controller_type: ControllerType::Xbox360,
             dsu_enabled: false,
             dsu_gravity: true,
+            gyro_ay_lock: -1.27,
+            gyro_recalib_delay: 3.0,
         }
     }
 }

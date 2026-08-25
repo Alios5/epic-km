@@ -8,10 +8,23 @@
 //! issues seen on the ViGEmBus → SDL path.
 //!
 //! Protocol reference: <https://v1993.github.io/cemuhook-protocol/>
-//! Gyroscope values are in deg/s, accelerometer in m/s².
-//! The rest gravity vector is (0, 9.81, 0) — one g on the Y axis.
-//! Drift is prevented by a mouse deadzone + EMA smoothing + pitch
-//! auto-recentering in mapping.rs, not by manipulating gravity.
+//! Gyroscope values are in deg/s. Acceleration values are in **g's**
+//! (1 g ≈ 9.8 m/s²) per the protocol spec — NOT m/s² (an earlier build
+//! sent 9.81 instead of 1.0, off by ~10x).
+//!
+//! Anti-recalibration lock (inspired by mouse2gyro by Feva):
+//! Emulators like Ryujinx/Eden periodically recalibrate their motion
+//! "zero" using the accelerometer reading at rest. If we send a
+//! perfectly flat gravity (ay = -1.0) while the player is actively
+//! moving the mouse, the emulator may snap the current orientation as
+//! the new "zero", causing a sudden vertical jump. To prevent this, we
+//! send a slightly offset gravity (ay = -1.27) during active play, and
+//! only reveal the true flat value (ay = -1.0) after the mouse has been
+//! idle for RECALIB_DELAY seconds — a moment where we *want* the
+//! emulator to recalibrate/recenter.
+//!
+//! Drift is also prevented by a mouse deadzone + EMA smoothing + pitch
+//! auto-recentering in mapping.rs.
 
 use crate::engine::{elog, EngineState};
 use crate::mapping::GamepadState;
@@ -41,6 +54,15 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// DS4 gyro raw unit (what `GamepadState` carries): 16 LSB per °/s.
 const DS4_GYRO_LSB_PER_DPS: f32 = 16.0;
+
+/// Small noise amplitude added to all accelerometer axes (mimics real sensor
+/// jitter, prevents the emulator from treating perfectly static values as a
+/// calibration anchor).
+const ACCEL_NOISE: f32 = 0.02;
+/// Gyro values above this threshold (in DS4 raw LSB) count as "mouse active".
+const GYRO_ACTIVE_THRESHOLD: i16 = 8;
+/// True flat gravity (1 g on Y, negative = DS4 playing position).
+const AY_FLAT: f32 = -1.0;
 
 struct Subscriber {
     last_seen: Instant,
@@ -93,6 +115,10 @@ fn serve(state: &Arc<EngineState>, socket: &UdpSocket) {
     // monotonic on Windows (NTP sync, clock skew) and can corrupt that
     // integration, which looks exactly like slow aim drift at rest.
     let motion_clock = Instant::now();
+    // Track the last time the mouse was actively moving (gyro non-zero),
+    // used by the anti-recalibration lock to decide whether to send the
+    // offset gravity (active) or the true flat gravity (idle → recalib).
+    let mut last_mouse_active = Instant::now();
 
     while state.running.load(Ordering::SeqCst) && state.profile.lock().dsu_enabled {
         // Drain every pending request.
@@ -113,11 +139,31 @@ fn serve(state: &Arc<EngineState>, socket: &UdpSocket) {
             subscribers.retain(|_, s| s.last_seen.elapsed() < CLIENT_TIMEOUT);
             if !subscribers.is_empty() {
                 let gamepad = *state.gamepad.lock();
-                let gravity = state.profile.lock().dsu_gravity;
+                let profile = state.profile.lock();
+                let gravity = profile.dsu_gravity;
+                let ay_lock = profile.gyro_ay_lock as f32;
+                let recalib_delay = Duration::from_secs_f64(profile.gyro_recalib_delay);
+                drop(profile);
                 let timestamp = motion_clock.elapsed().as_micros() as u64;
+                // Update mouse activity tracker: if gyro values are above
+                // the noise threshold, the mouse is actively moving.
+                if gamepad.gyro_pitch.abs() > GYRO_ACTIVE_THRESHOLD
+                    || gamepad.gyro_yaw.abs() > GYRO_ACTIVE_THRESHOLD
+                {
+                    last_mouse_active = now;
+                }
+                let idle = now.duration_since(last_mouse_active);
                 for (addr, sub) in subscribers.iter_mut() {
                     sub.packet_number = sub.packet_number.wrapping_add(1);
-                    let packet = build_data_packet(&gamepad, sub.packet_number, timestamp, gravity);
+                    let packet = build_data_packet(
+                        &gamepad,
+                        sub.packet_number,
+                        timestamp,
+                        gravity,
+                        idle,
+                        ay_lock,
+                        recalib_delay,
+                    );
                     let _ = socket.send_to(&packet, addr);
                 }
             }
@@ -202,15 +248,18 @@ fn handle_packet(
 /// gamepad (buttons/sticks included, so full-DSU clients like Dolphin could
 /// use it as-is); the gyroscope is converted from DS4 raw units to °/s with
 /// no rest-offset trim — the DSU path has no calibration blob to compensate.
-/// `gravity` controls the rest accelerometer: some games fuse it with the
-/// gyro for horizon correction. With the mouse deadzone + EMA smoothing
-/// in mapping.rs, the gyro reads exactly 0 at rest, so gravity fusion no
-/// longer causes drift. Sending zeroes leaves the game pure-gyro.
+/// `gravity` controls whether the rest accelerometer is sent. When enabled,
+/// the anti-recalibration lock logic uses `idle` (time since last mouse
+/// movement) to choose between the offset gravity (`ay_lock`, during active
+/// play) and the true flat gravity (`AY_FLAT`, after `recalib_delay` of rest).
 fn build_data_packet(
     gamepad: &GamepadState,
     packet_number: u32,
     timestamp_us: u64,
     gravity: bool,
+    idle: Duration,
+    ay_lock: f32,
+    recalib_delay: Duration,
 ) -> Vec<u8> {
     let b = &gamepad.buttons;
     let buttons_1 = (b.dpad_left as u8) << 7
@@ -269,7 +318,28 @@ fn build_data_packet(
     payload.extend_from_slice(&timestamp_us.to_le_bytes());
     // Rest gravity + gyro rates (deg/s). Signs match pad-motion's proven
     // mapping: mouse right → +yaw, mouse up → +pitch.
-    let accel = if gravity { [0.0f32, 9.81, 0.0] } else { [0.0; 3] };
+    //
+    // Anti-recalibration lock: during active play send ay = ay_lock so the
+    // emulator cannot recalibrate its zero-point mid-combat. After
+    // recalib_delay of mouse idleness, send the true flat ay = AY_FLAT to
+    // let the emulator recenter naturally. Set recalib_delay to 0 to always
+    // use ay_lock. Small noise on all axes mimics real sensor jitter.
+    let accel: [f32; 3] = if gravity {
+        let ay = if recalib_delay > Duration::ZERO && idle >= recalib_delay {
+            AY_FLAT
+        } else {
+            ay_lock
+        };
+        // Simple LCG noise: deterministic per-packet, good enough for jitter.
+        let seed = timestamp_us as u32 ^ packet_number;
+        let noise = |s: u32| -> f32 {
+            let v = (s.wrapping_mul(1664525).wrapping_add(1013904223)) as f32;
+            (v / f32::MAX - 0.5) * 2.0 * ACCEL_NOISE
+        };
+        [noise(seed), ay + noise(seed.wrapping_mul(3)), noise(seed.wrapping_mul(7))]
+    } else {
+        [0.0; 3]
+    };
     for v in accel {
         payload.extend_from_slice(&v.to_le_bytes());
     }
