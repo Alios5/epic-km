@@ -41,10 +41,11 @@
   }
 </script>
 
-<!-- Gyroscope axis modes only exist for the DS4 target (an XUSB pad has
-     no motion channels), so the whole section is hidden in Xbox 360 mode. -->
-{#if $profile.controllerType === "ds4"}
-  <section class="space-y-3">
+<!-- Gyroscope axis modes: the XUSB (Xbox 360) HID report has no motion
+     channels, but the values still reach games via the DSU/Cemuhook UDP
+     server (independent of the virtual controller type), so this section
+     is available for both Xbox 360 and DS4. -->
+<section class="space-y-3">
     <!-- X axis mode selector -->
     <div class="space-y-1.5">
       <span class="text-xs text-muted-foreground">{$t("rsm.xAxis")}</span>
@@ -102,5 +103,4 @@
       <p class="text-[11px] text-muted-foreground">{$t("rsm.dsuHint")}</p>
       <p class="text-[11px] text-muted-foreground">{$t("rsm.dsuGravityHint")}</p>
     </div>
-  </section>
-{/if}
+</section>

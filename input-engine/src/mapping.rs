@@ -1,5 +1,5 @@
 use crate::keycode::{code_to_scancode, is_mouse_code};
-use crate::profile::{AxisInputMode, ControllerType, Profile, StickCurve, StickDirection};
+use crate::profile::{AxisInputMode, Profile, StickCurve, StickDirection};
 
 /// Gamepad button bitflags matching XUSB_REPORT buttons.
 #[derive(Debug, Clone, Copy, Default)]
@@ -60,6 +60,9 @@ pub struct RawInputState {
     pub smooth_gyro_pitch: f64,
     /// Accumulated pitch for soft-limit + auto-recentering (anti-flip)
     pub pitch_accum: f64,
+    /// Timestamp of the previous `map_input` call, used to measure the
+    /// real elapsed time between ticks (see `MIN_DT`/`MAX_DT`).
+    pub last_tick: Option<std::time::Instant>,
 }
 
 /// Stick fraction produced per pixel/second of mouse speed at sensitivity 1.0.
@@ -91,6 +94,15 @@ const PITCH_LIMIT: f64 = 300.0;
 /// vertically, pitch_accum decays toward 0 at this rate per second.
 /// 0 = disabled. Mirrors pad-motion's pitch_recenter.
 const PITCH_RECENTER_RATE: f64 = 0.15;
+
+/// Minimum real dt (seconds) accepted between ticks. Guards against a
+/// near-zero dt (scheduler jitter / timer resolution) sending yaw/pitch
+/// to absurd values when dividing by it. Mirrors pad-motion's MIN_DT.
+const MIN_DT: f64 = 0.0005; // 0.5 ms
+/// Maximum real dt (seconds) accepted between ticks. Guards against a
+/// sudden burst if the loop stalled (window unfocus, OS hitch, capture
+/// mode toggled off and back on). Mirrors pad-motion's MAX_DT.
+const MAX_DT: f64 = 0.05; // 50 ms
 
 /// Exponential smoothing towards the target, independent of the polling rate.
 /// `amount` (0.0 = off .. 0.95) maps to a time constant of amount * 0.25 s.
@@ -164,8 +176,11 @@ fn process_axis_analog(
 }
 
 /// Processes a mouse-driven axis in Gyroscope mode: converts the raw pixel
-/// delta of this tick into a DS4 gyroscope angular rate, in raw units
-/// (16 LSB per °/s). When the mouse stops the rate is zero — like a real
+/// delta of this tick into an angular rate in deg/s (NOT DS4 raw LSB units
+/// — the caller applies `DS4_GYRO_LSB_PER_DPS` only at the final assignment
+/// to `state.gyro_*`, so that `PITCH_LIMIT`/`pitch_accum`, copied from
+/// pad-motion, operate on the same real-degrees scale pad-motion calibrated
+/// them for). When the mouse stops the rate is zero — like a real
 /// gyroscope, which only reports while the controller is rotating.
 /// A deadzone on raw pixels eliminates sensor noise that would otherwise
 /// produce a constant non-zero gyro rate (the main cause of drift).
@@ -174,7 +189,7 @@ fn process_axis_gyro(
     sensitivity: f64,
     axis_sensitivity: f64,
     invert: bool,
-    hz: f64,
+    dt: f64,
 ) -> f64 {
     // Deadzone: ignore micro-movements (sensor noise / sub-pixel jitter)
     if raw_pixels.abs() < GYRO_MOUSE_DEADZONE {
@@ -182,8 +197,10 @@ fn process_axis_gyro(
     }
     let mut degrees = raw_pixels * GYRO_DEG_PER_PX * sensitivity * axis_sensitivity;
     if invert { degrees = -degrees; }
-    let dps = degrees * hz;
-    dps * DS4_GYRO_LSB_PER_DPS
+    // Divide by the real elapsed time (mirrors pad-motion's
+    // `delta_rotation / dt`): the rate must reflect how long this pixel
+    // delta actually took to arrive, not an assumed nominal tick period.
+    degrees / dt
 }
 
 /// Applies stick processing: global + per-axis sensitivity, deadzone, curve,
@@ -268,7 +285,17 @@ pub fn map_input(
     // form (for Analog axes) and keep the raw pixel form (for Gyroscope
     // axes), before consuming the accumulator.
     let hz = profile.right_stick.refresh_interval.max(1) as f64;
-    let dt = 1.0 / hz;
+    // Real elapsed time since the previous tick, clamped to [MIN_DT, MAX_DT]
+    // (mirrors pad-motion): the emission loop paces ticks to 1/hz on
+    // average, but a stalled loop (window unfocus, OS hitch) or the first
+    // tick after capture mode is re-enabled must not let dt blow up the
+    // gyro rate or integrate a huge, bogus pitch step in one shot.
+    let now = std::time::Instant::now();
+    let dt = match input.last_tick {
+        Some(prev) => now.duration_since(prev).as_secs_f64().clamp(MIN_DT, MAX_DT),
+        None => 1.0 / hz,
+    };
+    input.last_tick = Some(now);
     let raw_dx = input.mouse_dx as f64;
     let raw_dy = input.mouse_dy as f64;
     let vel_dx = raw_dx * hz * MOUSE_SPEED_SCALE;
@@ -278,16 +305,13 @@ pub fn map_input(
     input.mouse_dy = 0;
 
     // Right stick: each axis independently is Analog (velocity-based,
-    // snaps back to 0) or Gyroscope (drives the DS4's real gyro channel
-    // instead of the stick, which then stays centered).
-    // Gyroscope mode only applies to the DS4 target — an XUSB pad has no
-    // motion channels, so both axes fall back to Analog in Xbox 360 mode
-    // (the UI also hides these selectors unless DS4 is selected).
-    let (x_mode, y_mode) = if profile.controller_type == ControllerType::Ds4 {
-        (profile.right_stick_x_mode, profile.right_stick_y_mode)
-    } else {
-        (AxisInputMode::Analog, AxisInputMode::Analog)
-    };
+    // snaps back to 0) or Gyroscope (drives GamepadState's gyro_pitch/
+    // gyro_yaw instead of the stick, which then stays centered).
+    // Gyroscope mode is available regardless of the virtual controller
+    // type: the XUSB (Xbox 360) HID report indeed has no motion channels,
+    // but the values still reach games via the DSU/Cemuhook UDP path
+    // (dsu.rs), which is independent of the ViGEmBus target.
+    let (x_mode, y_mode) = (profile.right_stick_x_mode, profile.right_stick_y_mode);
     let rx = match x_mode {
         AxisInputMode::Analog => {
             let target = process_axis_analog(
@@ -310,14 +334,17 @@ pub fn map_input(
                 profile.right_stick.sensitivity,
                 profile.right_stick.sensitivity_x,
                 profile.right_stick.invert_x,
-                hz,
+                dt,
             );
             // EMA smoothing (framerate-independent): eliminates jitter
             // from bursty OS mouse delivery without adding latency.
             let sm = profile.right_stick.smoothing;
             let alpha = if sm > 0.0 { 1.0 - sm.powf(dt / (1.0 / hz)) } else { 1.0 };
             input.smooth_gyro_yaw += (target_yaw - input.smooth_gyro_yaw) * alpha;
-            state.gyro_yaw = input.smooth_gyro_yaw.clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+            // Convert deg/s to DS4 raw units (16 LSB per deg/s) only at
+            // the final wire assignment.
+            state.gyro_yaw = (input.smooth_gyro_yaw * DS4_GYRO_LSB_PER_DPS)
+                .clamp(i16::MIN as f64, i16::MAX as f64) as i16;
             0.0
         }
     };
@@ -346,7 +373,7 @@ pub fn map_input(
                 profile.right_stick.sensitivity,
                 profile.right_stick.sensitivity_y,
                 profile.right_stick.invert_y,
-                hz,
+                dt,
             );
             // Soft pitch limit + auto-recentering (anti-flip, anti-drift):
             // the emulator integrates gyro_pitch to track tilt. If it
@@ -365,7 +392,10 @@ pub fn map_input(
             let sm = profile.right_stick.smoothing;
             let alpha = if sm > 0.0 { 1.0 - sm.powf(dt / (1.0 / hz)) } else { 1.0 };
             input.smooth_gyro_pitch += (target_pitch - input.smooth_gyro_pitch) * alpha;
-            state.gyro_pitch = input.smooth_gyro_pitch.clamp(i16::MIN as f64, i16::MAX as f64) as i16;
+            // Convert deg/s to DS4 raw units (16 LSB per deg/s) only at
+            // the final wire assignment.
+            state.gyro_pitch = (input.smooth_gyro_pitch * DS4_GYRO_LSB_PER_DPS)
+                .clamp(i16::MIN as f64, i16::MAX as f64) as i16;
             0.0
         }
     };

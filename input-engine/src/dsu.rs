@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 /// UDP port every DSU client expects the server on.
 const DSU_PORT: u16 = 26760;
@@ -87,6 +87,12 @@ fn serve(state: &Arc<EngineState>, socket: &UdpSocket) {
     let mut next_send = Instant::now();
     let mut announced = false;
     let mut buf = [0u8; 512];
+    // Monotonic clock for motion_data_timestamp — mirrors pad-motion's
+    // `now.elapsed()`. Clients integrate gyro using the delta between
+    // consecutive timestamps; SystemTime (wall clock) is NOT guaranteed
+    // monotonic on Windows (NTP sync, clock skew) and can corrupt that
+    // integration, which looks exactly like slow aim drift at rest.
+    let motion_clock = Instant::now();
 
     while state.running.load(Ordering::SeqCst) && state.profile.lock().dsu_enabled {
         // Drain every pending request.
@@ -108,10 +114,7 @@ fn serve(state: &Arc<EngineState>, socket: &UdpSocket) {
             if !subscribers.is_empty() {
                 let gamepad = *state.gamepad.lock();
                 let gravity = state.profile.lock().dsu_gravity;
-                let timestamp = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_micros() as u64)
-                    .unwrap_or(0);
+                let timestamp = motion_clock.elapsed().as_micros() as u64;
                 for (addr, sub) in subscribers.iter_mut() {
                     sub.packet_number = sub.packet_number.wrapping_add(1);
                     let packet = build_data_packet(&gamepad, sub.packet_number, timestamp, gravity);
