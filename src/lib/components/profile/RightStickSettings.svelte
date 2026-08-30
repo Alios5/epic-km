@@ -278,7 +278,7 @@
           <span class="text-xs font-medium">{$t("rsm.ayLock")}</span>
           <span class="text-xs text-muted-foreground tabular-nums">{$profile.gyroAyLock.toFixed(2)}</span>
         </div>
-        <Slider type="single" value={$profile.gyroAyLock} onValueChange={updateAyLock} min={-2.0} max={-1.0} step={0.01} />
+        <Slider type="single" value={$profile.gyroAyLock} onValueChange={updateAyLock} min={-1.0} max={-0.8} step={0.005} />
       </div>
 
       <!-- Natural recalibration delay -->

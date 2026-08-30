@@ -156,7 +156,7 @@ function defaultProfile(): Profile {
       refreshInterval: 240,
     },
     triggerThreshold: 0.5,
-    gyroAyLock: -1.27,
+    gyroAyLock: -0.96,
     gyroRecalibDelay: 3.0,
     captureToggleKey: "F1",
     hideCursor: true,

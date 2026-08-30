@@ -195,7 +195,7 @@ impl Default for Profile {
             controller_type: ControllerType::Xbox360,
             dsu_enabled: false,
             dsu_gravity: true,
-            gyro_ay_lock: -1.27,
+            gyro_ay_lock: -0.96,
             gyro_recalib_delay: 3.0,
         }
     }
