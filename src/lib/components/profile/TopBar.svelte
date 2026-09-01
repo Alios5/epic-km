@@ -6,11 +6,11 @@
   import { activeProfileName, profile, markDirty, markClean, getDefaultProfile } from "$lib/stores/profile";
   import { listProfiles, loadProfile, deleteProfile } from "$lib/stores/profileStorage";
   import { captureModeActive } from "$lib/stores/app";
-  import DownloadIcon from "@lucide/svelte/icons/download";
-  import FolderIcon from "@lucide/svelte/icons/folder-open";
-  import SaveIcon from "@lucide/svelte/icons/save";
-  import TrashIcon from "@lucide/svelte/icons/trash-2";
-  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import DownloadIcon from "~icons/solar/download-bold-duotone";
+  import FolderIcon from "~icons/solar/folder-open-bold-duotone";
+  import SaveIcon from "~icons/solar/diskette-bold-duotone";
+  import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
+  import ArrowLeftIcon from "~icons/solar/arrow-left-bold-duotone";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { open, save } from "@tauri-apps/plugin-dialog";
@@ -171,7 +171,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<header class="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card">
+<header class="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card shadow-sm">
   <Button variant="ghost" size="sm" onclick={onBack}>
     <ArrowLeftIcon class="size-4" />
   </Button>
@@ -181,7 +181,13 @@
   <!-- Left: capture status + hotkey config -->
   <div class="flex items-center gap-2">
     {#if $captureModeActive}
-      <Badge variant="destructive" class="h-8">{$t("capture.active")}</Badge>
+      <Badge variant="destructive" class="h-8 gap-1.5">
+        <span class="relative flex size-1.5">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-75"></span>
+          <span class="relative inline-flex size-1.5 rounded-full bg-destructive"></span>
+        </span>
+        {$t("capture.active")}
+      </Badge>
     {:else}
       <Badge variant="secondary" class="h-8">{$t("capture.inactive")}</Badge>
     {/if}
@@ -210,7 +216,7 @@
   <div class="flex-1 flex items-center justify-center gap-2">
     <select
       onchange={handleSelectProfile}
-      class="h-8 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground cursor-pointer hover:bg-accent transition-colors"
+      class="h-8 rounded-lg border border-border bg-background px-2 text-xs text-muted-foreground cursor-pointer hover:bg-accent transition-colors"
       title={$t("topbar.recent")}
     >
       <option value="">{$t("topbar.recent")}</option>
@@ -223,22 +229,23 @@
       value={profileName}
       oninput={onNameInput}
       placeholder={$t("topbar.profileName")}
-      class="max-w-[200px] h-8 text-sm text-center border border-border"
+      class="max-w-[200px] h-8 text-sm text-center border border-border shadow-sm"
     />
   </div>
 
   <!-- Right: actions -->
-  <div class="flex items-center gap-1">
-    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" aria-label={$t("common.export")} title={$t("common.export")} onclick={handleExport}>
+  <div class="flex items-center gap-1 rounded-lg border border-border bg-background/60 p-1">
+    <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("common.export")} title={$t("common.export")} onclick={handleExport}>
       <DownloadIcon class="size-4" />
     </Button>
-    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" aria-label={$t("common.openFile")} onclick={handleOpenProfile}>
+    <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("common.openFile")} onclick={handleOpenProfile}>
       <FolderIcon class="size-4" />
     </Button>
-    <Button variant="ghost" size="sm" class="h-8 w-8 p-0" aria-label={$t("common.delete")} title={$t("common.delete")} onclick={() => showDeleteDialog = true}>
+    <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("common.delete")} title={$t("common.delete")} onclick={() => showDeleteDialog = true}>
       <TrashIcon class="size-4 text-destructive" />
     </Button>
-    <Button variant="default" size="sm" class="h-8" onclick={onSave}>
+    <div class="h-5 w-px bg-border mx-0.5"></div>
+    <Button variant="default" size="sm" class="h-7 shadow-sm" onclick={onSave}>
       <SaveIcon class="size-4" />
       {$t("common.save")}
     </Button>
@@ -246,8 +253,8 @@
 </header>
 
 {#if showDeleteDialog}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div role="dialog" aria-modal="true" aria-label={$t("delete.title")} class="rounded-lg border border-border bg-card p-6 shadow-xl max-w-sm w-full mx-4">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-label={$t("delete.title")} class="rounded-xl border border-border bg-card p-6 shadow-2xl max-w-sm w-full mx-4">
       <h2 class="text-lg font-semibold mb-2">{$t("delete.title")}</h2>
       <p class="text-sm text-muted-foreground mb-6">
         {$t("delete.message", { name: profileName.trim() || $t("editor.defaultName") })}

@@ -6,7 +6,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
   import { t } from "$lib/stores/i18n";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import ChevronDownIcon from "~icons/solar/alt-arrow-down-bold-duotone";
 
   interface Props {
     stickKey: "leftStick" | "rightStick";

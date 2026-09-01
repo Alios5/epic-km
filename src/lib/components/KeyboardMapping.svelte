@@ -4,8 +4,8 @@
   import * as Select from "$lib/components/ui/select/index.js";
   import { profile, GAMEPAD_BUTTONS, type KeyboardMapping } from "$lib/stores/profile";
   import KeyCaptureInput from "$lib/components/KeyCaptureInput.svelte";
-  import PlusIcon from "@lucide/svelte/icons/plus";
-  import TrashIcon from "@lucide/svelte/icons/trash-2";
+  import PlusIcon from "~icons/solar/add-bold-duotone";
+  import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
 
   function addRow() {
     const newId = crypto.randomUUID();

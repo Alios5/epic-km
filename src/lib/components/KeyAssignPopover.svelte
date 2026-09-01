@@ -4,7 +4,7 @@
   import { profile, setKeyForButton, getKeyForButton } from "$lib/stores/profile";
   import { layoutMap, labelForCode } from "$lib/keyLabels";
   import { t, locale, type MessageKey } from "$lib/stores/i18n";
-  import TrashIcon from "@lucide/svelte/icons/trash-2";
+  import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
 
   interface Props {
     button: string;

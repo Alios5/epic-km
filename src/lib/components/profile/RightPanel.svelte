@@ -3,13 +3,16 @@
   import RightStickSettings from "$lib/components/profile/RightStickSettings.svelte";
   import { profile } from "$lib/stores/profile";
   import { t } from "$lib/stores/i18n";
-  import GamepadIcon from "@lucide/svelte/icons/gamepad-2";
+  import GamepadIcon from "~icons/solar/gamepad-minimalistic-bold-duotone";
 </script>
 
 <aside class="flex flex-col h-full overflow-y-auto">
   <!-- Section: Right bumpers/triggers + Start -->
-  <div class="px-3 py-3 border-b border-border">
-    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{$t("panel.rightTriggers")}</h2>
+  <div class="px-3 py-3 border-b border-border/70">
+    <h2 class="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2.5">
+      <span class="size-1 rounded-full bg-primary"></span>
+      {$t("panel.rightTriggers")}
+    </h2>
     <div class="space-y-1.5">
       <ButtonAssignRow button="RB" label="RB" />
       <ButtonAssignRow button="RT" label="RT" />
@@ -18,8 +21,11 @@
   </div>
 
   <!-- Section: Face buttons A/B/X/Y -->
-  <div class="px-3 py-3 border-b border-border">
-    <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{$t("panel.faceButtons")}</h2>
+  <div class="px-3 py-3 border-b border-border/70">
+    <h2 class="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2.5">
+      <span class="size-1 rounded-full bg-primary"></span>
+      {$t("panel.faceButtons")}
+    </h2>
     <div class="space-y-1.5">
       <ButtonAssignRow button="A" label="A" />
       <ButtonAssignRow button="B" label="B" />
@@ -30,8 +36,10 @@
 
   <!-- Section: Right stick -->
   <div class="px-3 py-3">
-    <div class="flex items-center gap-2 mb-2">
-      <GamepadIcon class="size-3.5 text-muted-foreground" />
+    <div class="flex items-center gap-2 mb-2.5">
+      <div class="flex items-center justify-center size-5 rounded-md bg-accent">
+        <GamepadIcon class="size-3 text-accent-foreground" />
+      </div>
       <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{$t("panel.rightStickMouse")}</h2>
     </div>
     <div class="space-y-3">

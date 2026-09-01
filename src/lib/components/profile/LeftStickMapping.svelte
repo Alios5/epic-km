@@ -5,8 +5,8 @@
   import { profile, markDirty, type StickDirection } from "$lib/stores/profile";
   import KeyCaptureInput from "$lib/components/KeyCaptureInput.svelte";
   import { t } from "$lib/stores/i18n";
-  import PlusIcon from "@lucide/svelte/icons/plus";
-  import TrashIcon from "@lucide/svelte/icons/trash-2";
+  import PlusIcon from "~icons/solar/add-bold-duotone";
+  import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
 
   const DIRECTIONS: StickDirection[] = ["up", "down", "left", "right"];
 

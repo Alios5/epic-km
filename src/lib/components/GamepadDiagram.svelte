@@ -45,6 +45,7 @@
 
 <div class="flex flex-col items-center justify-center gap-3 py-8">
   <div class="relative">
+    <div class="pointer-events-none absolute inset-0 -z-10 rounded-full bg-primary/20 blur-3xl scale-110"></div>
     <svg
         width="320"
         height="219"

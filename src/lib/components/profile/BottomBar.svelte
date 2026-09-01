@@ -7,7 +7,7 @@
   import { t } from "$lib/stores/i18n";
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
-  import SaveIcon from "@lucide/svelte/icons/save";
+  import SaveIcon from "~icons/solar/diskette-bold-duotone";
 
   interface Props {
     onSave: () => void;
@@ -44,7 +44,7 @@
   }
 </script>
 
-<footer class="flex items-center gap-4 px-4 py-2.5 border-t border-border bg-card">
+<footer class="flex items-center gap-4 px-4 py-2.5 border-t border-border bg-card shadow-[0_-4px_10px_-3px_rgba(0,0,0,0.05)]">
   <span class="text-xs font-medium whitespace-nowrap">{$t("bottombar.triggerThreshold")}</span>
   <Slider
     type="single"
@@ -88,7 +88,7 @@
   <div class="h-5 w-px bg-border"></div>
 
   <div class="ml-auto">
-    <Button size="sm" onclick={onSave}>
+    <Button size="sm" class="shadow-sm" onclick={onSave}>
       <SaveIcon class="size-4" />
       {$t("common.save")}
     </Button>
