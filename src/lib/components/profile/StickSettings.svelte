@@ -6,7 +6,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
   import { t } from "$lib/stores/i18n";
-  import ChevronDownIcon from "~icons/solar/alt-arrow-down-bold-duotone";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
 
   interface Props {
     stickKey: "leftStick" | "rightStick";
@@ -130,7 +130,7 @@
   </div>
 
   <!-- Invert checkboxes -->
-  <div class="space-y-3 pt-3 border-t border-border">
+  <div class="space-y-3 pt-3 border-t border-border/15">
     <div class="flex items-center justify-between">
       <label for="invert-y-{stickKey}" class="text-xs font-medium cursor-pointer select-none">{$t("stick.invertY")}</label>
       <Checkbox id="invert-y-{stickKey}" checked={stick.invertY} onCheckedChange={updateInvertY} />

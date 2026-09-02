@@ -44,7 +44,7 @@
   }
 </script>
 
-<footer class="flex items-center gap-4 px-4 py-2.5 border-t border-border bg-card shadow-[0_-4px_10px_-3px_rgba(0,0,0,0.05)]">
+<footer class="flex items-center gap-4 px-4 py-2.5 border-t border-border/15 bg-card shadow-[0_-4px_10px_-3px_rgba(0,0,0,0.05)]">
   <span class="text-xs font-medium whitespace-nowrap">{$t("bottombar.triggerThreshold")}</span>
   <Slider
     type="single"
@@ -59,7 +59,7 @@
     {$profile.triggerThreshold.toFixed(2)}
   </span>
 
-  <div class="h-5 w-px bg-border"></div>
+  <div class="h-5 w-px bg-border/25"></div>
 
   <div class="flex items-center gap-2">
     <span class="text-xs font-medium whitespace-nowrap">{$t("bottombar.captureKey")}</span>
@@ -85,7 +85,7 @@
     >
   </div>
 
-  <div class="h-5 w-px bg-border"></div>
+  <div class="h-5 w-px bg-border/25"></div>
 
   <div class="ml-auto">
     <Button size="sm" class="shadow-sm" onclick={onSave}>

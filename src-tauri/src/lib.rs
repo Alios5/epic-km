@@ -124,6 +124,35 @@ fn export_profile(path: String, data: serde_json::Value) -> Result<(), String> {
         .map_err(|e| format!("Failed to write profile file: {}", e))
 }
 
+/// Import a profile from an arbitrary file path (user-chosen via an open
+/// dialog on the frontend). Unlike `load_profile`, this reads the actual
+/// selected file and copies it into the internal profiles directory so it
+/// immediately shows up in the saved-profiles list, without needing to
+/// restart the app. Returns the name under which the profile was saved.
+#[tauri::command]
+fn import_profile(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read profile file: {}", e))?;
+    let data: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse profile file: {}", e))?;
+
+    let stem = std::path::Path::new(&path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Profil")
+        .to_string();
+
+    let dir = profiles_dir(&app)?;
+    let safe_name = stem.replace('/', "_").replace('\\', "_");
+    let dest = dir.join(format!("{}.json", safe_name));
+    let json = serde_json::to_string_pretty(&data)
+        .map_err(|e| format!("Failed to serialize profile: {}", e))?;
+    fs::write(&dest, json)
+        .map_err(|e| format!("Failed to write profile file: {}", e))?;
+
+    Ok(safe_name)
+}
+
 #[tauri::command]
 fn center_cursor() -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -326,7 +355,8 @@ pub fn run() {
             load_profile,
             list_profiles,
             delete_profile,
-            export_profile
+            export_profile,
+            import_profile
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

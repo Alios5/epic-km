@@ -52,17 +52,17 @@
 
   <div class="flex flex-1 min-h-0 overflow-hidden gap-2.5 p-2.5">
     <!-- Left panel: LB/LT/Back, left stick, D-Pad -->
-    <div class="w-72 shrink-0 rounded-xl border border-border bg-card/60 shadow-sm overflow-y-auto overscroll-none">
+    <div class="w-72 shrink-0 rounded-xl border border-border/12 bg-card/60 shadow-sm overflow-y-auto overscroll-none">
       <LeftPanel />
     </div>
 
     <!-- Center: gamepad diagram (visual only) -->
-    <div class="flex-1 flex items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-card/30 shadow-sm">
+    <div class="flex-1 flex items-center justify-center overflow-hidden rounded-xl border border-border/10 bg-card/30 shadow-sm">
       <GamepadDiagram />
     </div>
 
     <!-- Right panel: RB/RT/Start, ABXY, right stick -->
-    <div class="w-72 shrink-0 rounded-xl border border-border bg-card/60 shadow-sm overflow-y-auto overscroll-none">
+    <div class="w-72 shrink-0 rounded-xl border border-border/12 bg-card/60 shadow-sm overflow-y-auto overscroll-none">
       <RightPanel />
     </div>
   </div>

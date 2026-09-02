@@ -7,10 +7,10 @@
   import { t } from "$lib/stores/i18n";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
-  import MinusIcon from "~icons/solar/minus-bold-duotone";
-  import SquareIcon from "~icons/solar/maximize-square-minimalistic-bold-duotone";
-  import XIcon from "~icons/solar/close-bold-duotone";
-  import CopyIcon from "~icons/solar/minimize-square-minimalistic-bold-duotone";
+  import MinusIcon from "@lucide/svelte/icons/minus";
+  import SquareIcon from "@lucide/svelte/icons/square";
+  import XIcon from "@lucide/svelte/icons/x";
+  import CopyIcon from "@lucide/svelte/icons/copy";
 
   const appWindow = getCurrentWindow();
 
@@ -87,7 +87,7 @@
 </script>
 
 <div
-  class="flex items-center justify-between h-9 px-2 bg-card border-b border-border select-none"
+  class="flex items-center justify-between h-9 px-2 bg-card border-b border-border/15 select-none"
   data-tauri-drag-region
   role="button"
   tabindex="0"

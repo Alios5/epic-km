@@ -16,7 +16,7 @@
   });
 </script>
 
-<div class="flex items-center justify-between gap-2 rounded-lg border border-border/70 bg-background/40 px-2.5 py-1.5 hover:border-primary/40 hover:bg-muted/50 transition-colors">
+<div class="flex items-center justify-between gap-2 rounded-lg border border-transparent bg-background/40 px-2.5 py-1.5 hover:border-primary/40 hover:bg-muted/50 transition-colors">
   <span class="text-xs font-medium">{displayLabel}</span>
   <KeyAssignPopover {button} />
 </div>

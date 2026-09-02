@@ -1,6 +1,6 @@
 {
   "name": "epic-km",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "",
   "type": "module",
   "scripts": {
@@ -28,6 +28,7 @@
     "@tauri-apps/cli": "^2",
     "bits-ui": "^2.18.1",
     "clsx": "^2.1.1",
+    "daisyui": "^5.7.27",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "tailwind-merge": "^3.6.0",

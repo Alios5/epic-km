@@ -204,7 +204,7 @@
 
   <!-- Shared analog settings -->
   {#if anyAnalog}
-    <div class="space-y-3 border-t border-border pt-3">
+    <div class="space-y-3 border-t border-border/15 pt-3">
       <!-- Global sensitivity -->
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
@@ -262,7 +262,7 @@
 
   <!-- Shared gyro settings -->
   {#if anyGyro}
-    <div class="space-y-3 border-t border-border pt-3">
+    <div class="space-y-3 border-t border-border/15 pt-3">
       <!-- Gyro smoothing -->
       <div class="space-y-1.5">
         <div class="flex items-center justify-between">
@@ -293,7 +293,7 @@
   {/if}
 
   <!-- DSU (Cemuhook) motion server -->
-  <div class="space-y-1.5 border-t border-border pt-3">
+  <div class="space-y-1.5 border-t border-border/15 pt-3">
     <div class="flex items-center justify-between">
       <label for="dsu-enable" class="text-xs font-medium cursor-pointer select-none">{$t("rsm.dsuEnable")}</label>
       <Checkbox id="dsu-enable" checked={$profile.dsuEnabled} onCheckedChange={updateDsuEnabled} />

@@ -147,7 +147,7 @@
 
     <!-- Shared gyro smoothing -->
     {#if $profile.rightStickXMode === "gyroscope" || $profile.rightStickYMode === "gyroscope"}
-      <div class="space-y-1.5 border-t border-border pt-2">
+      <div class="space-y-1.5 border-t border-border/15 pt-2">
         <div class="flex items-center justify-between">
           <span class="text-xs font-medium">{$t("rsm.gyroSmoothing")}</span>
           <span class="text-xs text-muted-foreground tabular-nums">{Math.round($profile.rightStick.smoothing * 100)}%</span>
@@ -158,7 +158,7 @@
 
     <!-- Recalibration settings -->
     {#if $profile.rightStickXMode === "gyroscope" || $profile.rightStickYMode === "gyroscope"}
-      <div class="space-y-2 border-t border-border pt-2">
+      <div class="space-y-2 border-t border-border/15 pt-2">
         <div class="space-y-1">
           <div class="flex items-center justify-between">
             <span class="text-[11px] font-medium">{$t("rsm.ayLock")}</span>
@@ -177,7 +177,7 @@
     {/if}
 
     <!-- DSU (Cemuhook) motion server -->
-    <div class="space-y-1.5 pt-1 border-t border-border">
+    <div class="space-y-1.5 pt-1 border-t border-border/15">
       <div class="flex items-center justify-between">
         <label for="dsu-enable" class="text-xs font-medium cursor-pointer select-none">{$t("rsm.dsuEnable")}</label>
         <Checkbox id="dsu-enable" checked={$profile.dsuEnabled} onCheckedChange={updateDsuEnabled} />

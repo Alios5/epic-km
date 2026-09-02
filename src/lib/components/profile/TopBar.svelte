@@ -3,17 +3,18 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
-  import { activeProfileName, profile, markDirty, markClean, getDefaultProfile } from "$lib/stores/profile";
+  import { activeProfileName, profile, hasUnsavedChanges, markDirty, markClean, getDefaultProfile } from "$lib/stores/profile";
   import { listProfiles, loadProfile, deleteProfile } from "$lib/stores/profileStorage";
   import { captureModeActive } from "$lib/stores/app";
-  import DownloadIcon from "~icons/solar/download-bold-duotone";
-  import FolderIcon from "~icons/solar/folder-open-bold-duotone";
-  import SaveIcon from "~icons/solar/diskette-bold-duotone";
-  import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
-  import ArrowLeftIcon from "~icons/solar/arrow-left-bold-duotone";
+  import DownloadIcon from "@lucide/svelte/icons/download";
+  import FolderIcon from "@lucide/svelte/icons/folder-open";
+  import SaveIcon from "@lucide/svelte/icons/save";
+  import TrashIcon from "@lucide/svelte/icons/trash-2";
+  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+  import FilePlusIcon from "@lucide/svelte/icons/file-plus";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { open, save } from "@tauri-apps/plugin-dialog";
+  import { open, save, confirm } from "@tauri-apps/plugin-dialog";
   import { get } from "svelte/store";
   import { layoutMap, labelForCode } from "$lib/keyLabels";
   import { t, locale } from "$lib/stores/i18n";
@@ -86,15 +87,43 @@
         multiple: false,
       });
       if (selected && typeof selected === "string") {
-        const name = selected.split(/[\\/]/).pop()?.replace(/\.json$/, "") ?? "";
-        if (name) {
-          await loadProfile(name);
-          profileName = name;
-          savedProfiles = await listProfiles();
-        }
+        // Copies the picked file into the internal profiles directory (under
+        // its own name) and returns the name it was saved as, so it shows up
+        // in the "Recents" list right away.
+        const name = await invoke<string>("import_profile", { path: selected });
+        await loadProfile(name);
+        profileName = name;
+        savedProfiles = await listProfiles();
       }
     } catch (e) {
       console.error("Failed to open profile file:", e);
+    }
+  }
+
+  async function handleNewProfile() {
+    if (get(hasUnsavedChanges)) {
+      const proceed = await confirm(
+        $t("new.confirmMsg", { name: profileName.trim() || $t("editor.defaultName") }),
+        {
+          title: $t("new.confirmTitle"),
+          kind: "warning",
+          okLabel: $t("new.create"),
+          cancelLabel: $t("common.cancel"),
+        },
+      );
+      if (!proceed) return;
+    }
+
+    const def = getDefaultProfile();
+    profile.set(def);
+    activeProfileName.set("");
+    profileName = "";
+    markClean();
+
+    try {
+      await invoke("reload_profile", { profile: def });
+    } catch {
+      // Engine not running — ignore
     }
   }
 
@@ -171,12 +200,12 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<header class="flex items-center gap-3 px-4 py-2.5 border-b border-border bg-card shadow-sm">
+<header class="flex items-center gap-3 px-4 py-2.5 border-b border-border/15 bg-card shadow-sm">
   <Button variant="ghost" size="sm" onclick={onBack}>
     <ArrowLeftIcon class="size-4" />
   </Button>
 
-  <div class="h-5 w-px bg-border"></div>
+  <div class="h-5 w-px bg-border/25"></div>
 
   <!-- Left: capture status + hotkey config -->
   <div class="flex items-center gap-2">
@@ -210,7 +239,7 @@
     {/if}
   </div>
 
-  <div class="h-5 w-px bg-border"></div>
+  <div class="h-5 w-px bg-border/25"></div>
 
   <!-- Center: profile name + saved profiles dropdown -->
   <div class="flex-1 flex items-center justify-center gap-2">
@@ -229,12 +258,15 @@
       value={profileName}
       oninput={onNameInput}
       placeholder={$t("topbar.profileName")}
-      class="max-w-[200px] h-8 text-sm text-center border border-border shadow-sm"
+      class="max-w-[200px] h-8 text-sm text-center shadow-sm"
     />
   </div>
 
   <!-- Right: actions -->
   <div class="flex items-center gap-1 rounded-lg border border-border bg-background/60 p-1">
+    <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("topbar.newTitle")} title={$t("topbar.newTitle")} onclick={handleNewProfile}>
+      <FilePlusIcon class="size-4" />
+    </Button>
     <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("common.export")} title={$t("common.export")} onclick={handleExport}>
       <DownloadIcon class="size-4" />
     </Button>
@@ -244,7 +276,7 @@
     <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("common.delete")} title={$t("common.delete")} onclick={() => showDeleteDialog = true}>
       <TrashIcon class="size-4 text-destructive" />
     </Button>
-    <div class="h-5 w-px bg-border mx-0.5"></div>
+    <div class="h-5 w-px bg-border/25 mx-0.5"></div>
     <Button variant="default" size="sm" class="h-7 shadow-sm" onclick={onSave}>
       <SaveIcon class="size-4" />
       {$t("common.save")}
