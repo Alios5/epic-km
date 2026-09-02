@@ -319,28 +319,20 @@ fn build_data_packet(
     // Rest gravity + gyro rates (deg/s). Signs match pad-motion's proven
     // mapping: mouse right → +yaw, mouse up → +pitch.
     //
-    // Anti-recalibration lock: during active play the gravity vector is kept
-    // at a small, constant tilt (ay = ay_lock as the Y component, az chosen so
-    // the magnitude stays 1 g). Sensor-fusion algorithms in emulators like
-    // Ryujinx expect a physically valid unit gravity vector; sending |ay| > 1
-    // makes the game think the controller is being accelerated and it fights
-    // the user's aim. After recalib_delay of mouse idleness, send the true
-    // flat gravity (az = 0, ay = AY_FLAT) to let the emulator recentre.
-    //
-    // Small noise is added then re-normalized to keep the total magnitude at
-    // ~1 g, which mimics real sensor jitter without breaking the physics.
+    // Anti-recalibration lock (mouse2gyro by Feva approach): during active
+    // play we send ay = ay_lock (e.g. -1.27, slightly more than 1 g). This
+    // makes the emulator's sensor fusion believe the controller is under
+    // acceleration, so it refuses to snap the current orientation as its new
+    // "zero" — preventing the vertical jump that would otherwise happen when
+    // the mouse stops. After `recalib_delay` seconds of mouse idleness, we
+    // send the true flat gravity (ay = -1.0) so the emulator can naturally
+    // recenter. Small noise is added to all axes to mimic real sensor jitter.
     let accel: [f32; 3] = if gravity {
         let ay = if recalib_delay > Duration::ZERO && idle >= recalib_delay {
             AY_FLAT
         } else {
-            // ay_lock is the desired Y cosine of the unit gravity vector.
-            // Clamp to the valid range so the residual tilt is real.
-            ay_lock.clamp(-1.0, 1.0)
+            ay_lock
         };
-        // az is the forward/backward tilt that makes (ax, ay, az) a unit vector.
-        // Sign is negative because the DS4 is held with the front screen facing
-        // the player; this just needs to be non-zero to avoid "flat" recalibration.
-        let az = if idle >= recalib_delay { 0.0 } else { -(1.0 - ay * ay).sqrt() };
 
         // Simple LCG noise: deterministic per-packet, good enough for jitter.
         let seed = timestamp_us as u32 ^ packet_number;
@@ -348,16 +340,9 @@ fn build_data_packet(
             let v = (s.wrapping_mul(1664525).wrapping_add(1013904223)) as f32;
             (v / f32::MAX - 0.5) * 2.0 * ACCEL_NOISE
         };
-        let mut ax = noise(seed);
-        let mut ay = ay + noise(seed.wrapping_mul(3));
-        let mut az = az + noise(seed.wrapping_mul(7));
-        // Re-normalize so the gravity magnitude stays ~1 g (no over-gravity).
-        let mag = (ax * ax + ay * ay + az * az).sqrt();
-        if mag > 0.0 {
-            ax /= mag;
-            ay /= mag;
-            az /= mag;
-        }
+        let ax = noise(seed);
+        let ay = ay + noise(seed.wrapping_mul(3));
+        let az = noise(seed.wrapping_mul(7));
         [ax, ay, az]
     } else {
         [0.0; 3]

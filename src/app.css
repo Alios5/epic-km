@@ -110,19 +110,19 @@ input, textarea, select {
 /* Theme — Dark (active: <html class="dark">) */
 .dark {
   --background: oklch(0.1645 0.0086 274.3354);
-  --foreground: oklch(0.9851 0 0);
+  --foreground: oklch(0.92 0 0);
   --card: oklch(0.1919 0.0126 270.6840);
-  --card-foreground: oklch(0.9851 0 0);
+  --card-foreground: oklch(0.92 0 0);
   --popover: oklch(0.1645 0.0086 274.3354);
-  --popover-foreground: oklch(0.9851 0 0);
+  --popover-foreground: oklch(0.92 0 0);
   --primary: oklch(0.6559 0.2328 34.5244);
   --primary-foreground: oklch(0.9592 0.0288 72.4798);
   --secondary: oklch(0.2393 0.0142 266.9746);
-  --secondary-foreground: oklch(0.9851 0 0);
+  --secondary-foreground: oklch(0.92 0 0);
   --muted: oklch(0.2393 0.0142 266.9746);
   --muted-foreground: oklch(0.7118 0.0129 286.0665);
   --accent: oklch(0.3715 0 0);
-  --accent-foreground: oklch(0.9851 0 0);
+  --accent-foreground: oklch(0.92 0 0);
   --destructive: oklch(0.5945 0.1911 25.1414);
   --destructive-foreground: oklch(1.0000 0 0);
   --border-clr: oklch(0.2393 0.0142 266.9746);
