@@ -15,3 +15,6 @@ mod stub;
 
 #[cfg(not(target_os = "windows"))]
 pub use stub::{start_capture, stop_capture, is_capturing};
+
+#[cfg(target_os = "linux")]
+pub mod linux_gamepad;

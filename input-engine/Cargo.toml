@@ -25,3 +25,6 @@ windows = { version = "0.62", features = [
 # Vendored copy (../vigem-client) patched with the extended DS4 report
 # (gyroscope/accelerometer) that upstream leaves commented out.
 vigem-client = { path = "../vigem-client", features = ["unstable_ds4"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.12"

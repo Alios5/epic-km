@@ -223,7 +223,17 @@ pub fn vigem_available() -> bool {
     {
         vigem_client::Client::connect().is_ok()
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        // Functional check: /dev/uinput must exist AND be writable by the
+        // current user (module loaded + permissions/udev rule in place).
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/uinput")
+            .is_ok()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         false
     }
@@ -415,16 +425,60 @@ fn emission_thread(state: Arc<EngineState>) {
         elog(&state, "Emission thread stopped");
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     {
+        use crate::linux_gamepad::LinuxGamepad;
+
+        let mut gamepad = match LinuxGamepad::new() {
+            Ok(g) => g,
+            Err(e) => {
+                elog(&state, &format!("Failed to create uinput virtual gamepad: {}", e));
+                state.running.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        elog(&state, "Emission thread started — uinput gamepad created");
+
         while state.running.load(Ordering::SeqCst) {
             let hz = {
                 let p = state.profile.lock();
                 p.right_stick.refresh_interval.max(1)
             };
-            let interval_us = 1_000_000 / hz as u64;
-            thread::sleep(Duration::from_micros(interval_us));
+            let period = Duration::from_secs_f64(1.0 / hz as f64);
+            let tick_start = std::time::Instant::now();
+
+            let capture_active = state.capture_mode_active.load(Ordering::SeqCst);
+            let gamepad_state = {
+                let mut raw = state.raw_input.lock();
+                let profile = state.profile.lock();
+                if capture_active {
+                    map_input(&mut raw, &profile)
+                } else {
+                    raw.mouse_dx = 0;
+                    raw.mouse_dy = 0;
+                    GamepadState::default()
+                }
+            };
+            *state.gamepad.lock() = gamepad_state;
+
+            if let Err(e) = gamepad.update(&gamepad_state) {
+                eprintln!("[input-engine] uinput update error: {}", e);
+            }
+
+            let elapsed = tick_start.elapsed();
+            if elapsed < period {
+                thread::sleep(period - elapsed);
+            }
         }
+
+        elog(&state, "Emission thread stopped");
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        elog(&state, "Virtual gamepad output is not supported on this platform");
+        state.running.store(false, Ordering::SeqCst);
     }
 }
 
