@@ -1,6 +1,6 @@
 [package]
 name = "epic-mouse"
-version = "0.2.4"
+version = "0.2.5"
 description = "Emulate an Xbox 360 controller from mouse and keyboard"
 authors = ["Alios5"]
 edition = "2021"

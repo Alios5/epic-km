@@ -20,6 +20,52 @@ use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
 use evdev::{AttributeSet, Device, EventType, InputEvent, Key, RelativeAxisType};
 use std::os::unix::io::AsRawFd;
 use std::sync::atomic::Ordering as AtomicOrdering;
+use x11rb::connection::Connection;
+use x11rb::protocol::xfixes;
+use x11rb::rust_connection::RustConnection;
+
+/// Hides/shows the system cursor *icon* via the X11 XFixes extension while
+/// capture mode is active. Grabbing the mouse device (`EVIOCGRAB`, below)
+/// already stops the OS pointer from moving, but the icon otherwise stays
+/// frozen and visible at its last position — this makes it fully invisible
+/// too, matching the Windows behavior (`SetSystemCursor` + `ClipCursor`).
+///
+/// Wayland compositors deliberately expose no equivalent global mechanism
+/// (letting an arbitrary client hide the pointer session-wide would be a
+/// security/UX footgun), so this is a no-op there — the pointer still stops
+/// moving thanks to the device grab, only the frozen icon remains visible.
+struct X11Cursor {
+    conn: RustConnection,
+    root: u32,
+}
+
+impl X11Cursor {
+    fn connect() -> Option<Self> {
+        if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+            log("Wayland session detected — the system cursor icon cannot be hidden (no global API), but it stops moving since the device is grabbed");
+            return None;
+        }
+        let (conn, screen_num) = x11rb::connect(None).ok()?;
+        let root = conn.setup().roots.get(screen_num)?.root;
+        // XFixes requires a version handshake before any other request.
+        xfixes::query_version(&conn, 5, 0).ok()?.reply().ok()?;
+        Some(Self { conn, root })
+    }
+
+    fn hide(&self) {
+        if let Ok(cookie) = xfixes::hide_cursor(&self.conn, self.root) {
+            let _ = cookie.check();
+        }
+        let _ = self.conn.flush();
+    }
+
+    fn show(&self) {
+        if let Ok(cookie) = xfixes::show_cursor(&self.conn, self.root) {
+            let _ = cookie.check();
+        }
+        let _ = self.conn.flush();
+    }
+}
 
 // Global pointer to the shared state, set before the capture thread starts.
 static mut SHARED_STATE: Option<Arc<EngineState>> = None;
@@ -320,6 +366,11 @@ pub fn capture_thread(state: Arc<EngineState>) {
     }
     log_toggle_key(&state);
 
+    let x11_cursor = X11Cursor::connect();
+    if x11_cursor.is_some() {
+        log("X11 cursor control ready — the cursor icon will be hidden while capture mode is active");
+    }
+
     let mut grabbed = false;
     let mut forwarder: Option<VirtualDevice> = None;
 
@@ -344,12 +395,18 @@ pub fn capture_thread(state: Arc<EngineState>) {
                     }
                 }
                 forwarder = build_forwarder(&devices);
+                if let Some(cursor) = x11_cursor.as_ref() {
+                    cursor.hide();
+                }
                 log(&format!("Grabbed {} input device(s)", ok));
             } else {
                 for d in devices.iter_mut().filter(|d| !d.dead) {
                     let _ = d.dev.ungrab();
                 }
                 forwarder = None;
+                if let Some(cursor) = x11_cursor.as_ref() {
+                    cursor.show();
+                }
                 clear_input_state(&state);
             }
             grabbed = want_grab;
@@ -409,9 +466,14 @@ pub fn capture_thread(state: Arc<EngineState>) {
         }
     }
 
-    // Cleanup: release every grab and drop pressed state.
+    // Cleanup: release every grab, restore the cursor icon and drop pressed state.
     for d in devices.iter_mut() {
         let _ = d.dev.ungrab();
+    }
+    if grabbed {
+        if let Some(cursor) = x11_cursor.as_ref() {
+            cursor.show();
+        }
     }
     if state.capture_mode_active.swap(false, Ordering::SeqCst) {
         if let Some(cb) = state.capture_mode_callback.lock().as_ref() {

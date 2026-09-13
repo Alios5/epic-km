@@ -6,14 +6,10 @@ on:
       - "v*"
 
 jobs:
-  release:
+  release-windows:
+    runs-on: windows-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [windows-latest, ubuntu-22.04]
-    runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,12 +20,6 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
-
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -51,3 +41,65 @@ jobs:
             ### Downloads
             - **Windows**: `.msi` installer or NSIS `.exe`
             - **Linux**: `.AppImage` / `.deb` (requires `/dev/uinput` access)
+
+  # Built as its own job (not via tauri-action) so the AppImage can be
+  # patched between build and upload: linuxdeploy bundles the runner's
+  # libwayland-client/-server/-cursor/-egl into the AppImage, and the
+  # AppImage runtime prepends its own usr/lib to LD_LIBRARY_PATH — so on
+  # rolling-release distros (Arch/CachyOS...) whose Mesa/graphics stack is
+  # newer than Ubuntu 22.04's, the bundled Wayland libs shadow the host's
+  # and break ABI compatibility with Mesa's EGL/dri drivers. Wayland/Mesa
+  # libraries must always come from the host, never from the bundle.
+  release-linux:
+    needs: release-windows
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Build AppImage + deb bundles
+        run: npm run tauri build
+
+      - name: Strip bundled Wayland libs from the AppImage (must come from host)
+        run: |
+          set -e
+          BUNDLE_DIR="src-tauri/target/release/bundle/appimage"
+          APPIMAGE=$(find "$BUNDLE_DIR" -maxdepth 1 -name '*.AppImage' | head -n1)
+          echo "Patching $APPIMAGE"
+          chmod +x "$APPIMAGE"
+          APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGE" --appimage-extract
+          rm -fv squashfs-root/usr/lib/libwayland-client.so* \
+                 squashfs-root/usr/lib/libwayland-cursor.so* \
+                 squashfs-root/usr/lib/libwayland-egl.so* \
+                 squashfs-root/usr/lib/libwayland-server.so*
+          curl -Lo appimagetool.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          rm -f "$APPIMAGE"
+          APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool.AppImage squashfs-root "$APPIMAGE"
+          chmod +x "$APPIMAGE"
+
+      - name: Upload Linux artifacts to the release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb

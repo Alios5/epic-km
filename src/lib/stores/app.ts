@@ -9,6 +9,7 @@ export const prerequisitesInstalled = writable<boolean>(false);
 export const vigemStatus = writable<VigemStatus>("unknown");
 export const engineRunning = writable<boolean>(false);
 export const captureModeActive = writable<boolean>(false);
+export const debugConsoleOpen = writable<boolean>(false);
 
 // ViGEmBus driver repository
 export const VIGEMBUS_REPO_URL =

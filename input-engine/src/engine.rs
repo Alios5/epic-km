@@ -443,11 +443,21 @@ fn emission_thread(state: Arc<EngineState>) {
     {
         use crate::linux_gamepad::LinuxGamepad;
 
+        // NOTE: do NOT stop `running` on failure here — that flag also
+        // gates the capture thread's main loop. Losing the virtual gamepad
+        // must not take down keyboard/mouse capture (and the toggle
+        // hotkey/button) with it, or the whole app looks dead with no clue
+        // why. The prerequisite screen (`vigem_available`) is the real gate;
+        // this is just a defensive fallback if /dev/uinput becomes
+        // inaccessible after that check (e.g. udev rule race, group not
+        // yet refreshed for this session).
         let mut gamepad = match LinuxGamepad::new() {
             Ok(g) => g,
             Err(e) => {
-                elog(&state, &format!("Failed to create uinput virtual gamepad: {}", e));
-                state.running.store(false, Ordering::SeqCst);
+                elog(&state, &format!(
+                    "Failed to create uinput virtual gamepad: {} — capture will still work but no gamepad output is possible until /dev/uinput is accessible",
+                    e
+                ));
                 return;
             }
         };

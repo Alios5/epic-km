@@ -6,13 +6,14 @@
   import * as Select from "$lib/components/ui/select/index.js";
   import { activeProfileName, profile, hasUnsavedChanges, markDirty, markClean, getDefaultProfile } from "$lib/stores/profile";
   import { listProfiles, loadProfile, deleteProfile } from "$lib/stores/profileStorage";
-  import { captureModeActive } from "$lib/stores/app";
+  import { captureModeActive, debugConsoleOpen } from "$lib/stores/app";
   import DownloadIcon from "~icons/solar/download-minimalistic-bold-duotone";
   import FolderIcon from "~icons/solar/folder-open-bold-duotone";
   import SaveIcon from "~icons/solar/diskette-bold-duotone";
   import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
   import ArrowLeftIcon from "~icons/solar/alt-arrow-left-bold-duotone";
   import FilePlusIcon from "~icons/solar/document-add-bold-duotone";
+  import BugIcon from "~icons/solar/bug-bold-duotone";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { confirmDialog, fileDialog } from "$lib/stores/dialogs";
@@ -275,6 +276,17 @@
     </Button>
     <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("common.delete")} title={$t("common.delete")} onclick={() => showDeleteDialog = true}>
       <TrashIcon class="size-4 text-destructive" />
+    </Button>
+    <div class="h-5 w-px bg-border/25 mx-0.5"></div>
+    <Button
+      variant={$debugConsoleOpen ? "secondary" : "ghost"}
+      size="sm"
+      class="h-7 w-7 p-0"
+      aria-label={$t("debug.toggle")}
+      title={$t("debug.toggle")}
+      onclick={() => debugConsoleOpen.update((v) => !v)}
+    >
+      <BugIcon class="size-4" />
     </Button>
     <div class="h-5 w-px bg-border/25 mx-0.5"></div>
     <Button variant="default" size="sm" class="h-7 shadow-sm" onclick={onSave}>

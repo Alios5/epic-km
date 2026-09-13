@@ -6,6 +6,7 @@
   import LeftPanel from "$lib/components/profile/LeftPanel.svelte";
   import RightPanel from "$lib/components/profile/RightPanel.svelte";
   import GamepadDiagram from "$lib/components/GamepadDiagram.svelte";
+  import DebugConsole from "$lib/components/DebugConsole.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { get } from "svelte/store";
   import { t } from "$lib/stores/i18n";
@@ -66,6 +67,8 @@
       <RightPanel />
     </div>
   </div>
+
+  <DebugConsole />
 
   <BottomBar onSave={handleSave} />
 
