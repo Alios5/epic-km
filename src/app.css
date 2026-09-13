@@ -72,6 +72,11 @@ input, textarea, select {
   --border-clr: oklch(0.9219 0 0);
   --input: oklch(0.9219 0 0);
   --ring: oklch(0.6559 0.2328 34.5244);
+  --glass: oklch(0.998 0.01 95.2193);
+  --glassline: oklch(0.88 0.018 249 / 0.55);
+  --glassline-hi: oklch(1 0 0 / 0.85);
+  --panel-shadow: 0 1px 2px oklch(0.18 0.02 255 / 0.04), 0 12px 32px oklch(0.18 0.02 255 / 0.06);
+  --float-shadow: 0 18px 50px oklch(0.18 0.03 255 / 0.16);
   --chart-1: oklch(0.8093 0.0985 252.2024);
   --chart-2: oklch(0.6207 0.1894 259.9358);
   --chart-3: oklch(0.5495 0.2202 263.0917);
@@ -128,6 +133,11 @@ input, textarea, select {
   --border-clr: oklch(0.2393 0.0142 266.9746);
   --input: oklch(0.2393 0.0142 266.9746);
   --ring: oklch(0.6559 0.2328 34.5244);
+  --glass: oklch(0.245 0.02 265);
+  --glassline: oklch(0.2393 0.0142 266.9746 / 0.55);
+  --glassline-hi: oklch(1 0 0 / 0.13);
+  --panel-shadow: 0 1px 0 oklch(1 0 0 / 0.035) inset, 0 18px 46px oklch(0.04 0.01 255 / 0.24);
+  --float-shadow: 0 24px 70px oklch(0.03 0.015 255 / 0.55), 0 1px 0 oklch(1 0 0 / 0.04) inset;
   --chart-1: oklch(0.8093 0.0985 252.2024);
   --chart-2: oklch(0.6207 0.1894 259.9358);
   --chart-3: oklch(0.5495 0.2202 263.0917);
@@ -199,6 +209,8 @@ input, textarea, select {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-glass: var(--glass);
+  --color-glassline: var(--glassline);
   --font-sans: var(--font-sans);
   --font-serif: var(--font-serif);
   --font-mono: var(--font-mono);
@@ -215,6 +227,45 @@ input, textarea, select {
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+}
+
+/*
+ * Glass surfaces — direction "verre" (inspired by Selenite's console vitrée).
+ * `.glass-panel`: large static surfaces (side panels, toolbars) — sheen
+ * gradient running top-left → bottom-right + soft shadow, no blur (they sit
+ * over the app background, not over moving content).
+ * `.elevated-panel`: floating/overlay surfaces (dialogs, popovers, selects) —
+ * fully opaque so their contents stay legible above anything.
+ * Both use a gradient border (top edge lighter, bottom edge darker) painted
+ * under a transparent border via the padding-box/border-box layering trick,
+ * which gives the panels their compressed, recessed depth.
+ * The actual frosted-glass look on individual controls (inputs, outlined
+ * buttons, select triggers) comes from `bg-background/NN backdrop-blur-sm`
+ * applied directly where they're used.
+ */
+@utility glass-panel {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(to bottom right, var(--glass), var(--card)) padding-box,
+    linear-gradient(to bottom, var(--glassline-hi), var(--glassline)) border-box;
+  box-shadow: var(--panel-shadow);
+}
+
+@utility elevated-panel {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(to bottom, var(--popover), var(--popover)) padding-box,
+    linear-gradient(to bottom, var(--glassline-hi), var(--glassline)) border-box;
+  box-shadow: var(--float-shadow);
+}
+
+/* See Selenite's note: nesting `backdrop-filter` inside a transformed,
+   GPU-layered ancestor (e.g. a centered dialog using translate + will-change)
+   triggers a Chromium/WebView2 bug where the element's own text rasterizes
+   blurry. `.elevated-panel` is already opaque, so disable blur on anything
+   nested inside one — it would be a visual no-op anyway. */
+.elevated-panel :is(input, textarea, button, [role="combobox"], [data-slot="select-trigger"]) {
+  backdrop-filter: none !important;
 }
 
 @layer base {
@@ -270,5 +321,31 @@ input, textarea, select {
   .checkbox {
     box-shadow: none !important;
     border-color: color-mix(in oklch, var(--color-base-content, currentColor) 30%, transparent) !important;
+  }
+
+  /* Frosted-glass look on interactive controls: translucent background over
+     the page's own gradient wash + a light blur, instead of a flat opaque
+     fill. Kept off inside `.elevated-panel` (already opaque, see above). */
+  .btn-outline,
+  .input,
+  .select,
+  .textarea {
+    background-color: color-mix(in oklch, var(--color-base-100) 55%, transparent) !important;
+    backdrop-filter: blur(10px);
+  }
+  .btn-outline:hover,
+  .input:hover,
+  .select:hover {
+    background-color: color-mix(in oklch, var(--color-base-100) 72%, transparent) !important;
+  }
+  .input:focus,
+  .input:focus-within,
+  .select:focus,
+  .textarea:focus {
+    background-color: color-mix(in oklch, var(--color-base-100) 85%, transparent) !important;
+  }
+  .checkbox {
+    background-color: color-mix(in oklch, var(--color-base-100) 45%, transparent) !important;
+    backdrop-filter: blur(6px);
   }
 }

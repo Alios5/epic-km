@@ -4,6 +4,8 @@
   import { getVersion } from "@tauri-apps/api/app";
   import TitleBar from "$lib/components/TitleBar.svelte";
   import ResizeHandles from "$lib/components/ResizeHandles.svelte";
+  import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+  import FileDialog from "$lib/components/FileDialog.svelte";
   let { children } = $props();
 
   let version = $state("");
@@ -24,4 +26,6 @@
       >v{version}</span
     >
   {/if}
+  <ConfirmDialog />
+  <FileDialog />
 </div>

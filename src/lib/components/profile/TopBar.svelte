@@ -3,18 +3,19 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Input } from "$lib/components/ui/input/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
+  import * as Select from "$lib/components/ui/select/index.js";
   import { activeProfileName, profile, hasUnsavedChanges, markDirty, markClean, getDefaultProfile } from "$lib/stores/profile";
   import { listProfiles, loadProfile, deleteProfile } from "$lib/stores/profileStorage";
   import { captureModeActive } from "$lib/stores/app";
-  import DownloadIcon from "@lucide/svelte/icons/download";
-  import FolderIcon from "@lucide/svelte/icons/folder-open";
-  import SaveIcon from "@lucide/svelte/icons/save";
-  import TrashIcon from "@lucide/svelte/icons/trash-2";
-  import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
-  import FilePlusIcon from "@lucide/svelte/icons/file-plus";
+  import DownloadIcon from "~icons/solar/download-minimalistic-bold-duotone";
+  import FolderIcon from "~icons/solar/folder-open-bold-duotone";
+  import SaveIcon from "~icons/solar/diskette-bold-duotone";
+  import TrashIcon from "~icons/solar/trash-bin-trash-bold-duotone";
+  import ArrowLeftIcon from "~icons/solar/alt-arrow-left-bold-duotone";
+  import FilePlusIcon from "~icons/solar/document-add-bold-duotone";
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { open, save, confirm } from "@tauri-apps/plugin-dialog";
+  import { confirmDialog, fileDialog } from "$lib/stores/dialogs";
   import { get } from "svelte/store";
   import { layoutMap, labelForCode } from "$lib/keyLabels";
   import { t, locale } from "$lib/stores/i18n";
@@ -69,9 +70,11 @@
   async function handleExport() {
     try {
       const name = profileName.trim() || $t("editor.defaultName");
-      const path = await save({
-        defaultPath: `${name}.json`,
-        filters: [{ name: "JSON", extensions: ["json"] }],
+      const path = await fileDialog({
+        mode: "save",
+        title: $t("file.exportTitle"),
+        extension: "json",
+        defaultFilename: `${name}.json`,
       });
       if (!path) return;
       await invoke("export_profile", { path, data: get(profile) });
@@ -82,11 +85,12 @@
 
   async function handleOpenProfile() {
     try {
-      const selected = await open({
-        filters: [{ name: "Profil", extensions: ["json"] }],
-        multiple: false,
+      const selected = await fileDialog({
+        mode: "open",
+        title: $t("file.importTitle"),
+        extension: "json",
       });
-      if (selected && typeof selected === "string") {
+      if (selected) {
         // Copies the picked file into the internal profiles directory (under
         // its own name) and returns the name it was saved as, so it shows up
         // in the "Recents" list right away.
@@ -102,15 +106,13 @@
 
   async function handleNewProfile() {
     if (get(hasUnsavedChanges)) {
-      const proceed = await confirm(
-        $t("new.confirmMsg", { name: profileName.trim() || $t("editor.defaultName") }),
-        {
-          title: $t("new.confirmTitle"),
-          kind: "warning",
-          okLabel: $t("new.create"),
-          cancelLabel: $t("common.cancel"),
-        },
-      );
+      const proceed = await confirmDialog({
+        title: $t("new.confirmTitle"),
+        message: $t("new.confirmMsg", { name: profileName.trim() || $t("editor.defaultName") }),
+        kind: "warning",
+        okLabel: $t("new.create"),
+        cancelLabel: $t("common.cancel"),
+      });
       if (!proceed) return;
     }
 
@@ -127,9 +129,7 @@
     }
   }
 
-  async function handleSelectProfile(e: Event) {
-    const target = e.target as HTMLSelectElement;
-    const name = target.value;
+  async function handleSelectProfile(name: string) {
     if (!name) return;
     try {
       await loadProfile(name);
@@ -243,16 +243,16 @@
 
   <!-- Center: profile name + saved profiles dropdown -->
   <div class="flex-1 flex items-center justify-center gap-2">
-    <select
-      onchange={handleSelectProfile}
-      class="h-8 rounded-lg border border-border bg-background px-2 text-xs text-muted-foreground cursor-pointer hover:bg-accent transition-colors"
-      title={$t("topbar.recent")}
-    >
-      <option value="">{$t("topbar.recent")}</option>
-      {#each savedProfiles as name}
-        <option value={name}>{name}</option>
-      {/each}
-    </select>
+    <Select.Root type="single" onValueChange={handleSelectProfile}>
+      <Select.Trigger class="h-8 text-xs" title={$t("topbar.recent")}>
+        {$t("topbar.recent")}
+      </Select.Trigger>
+      <Select.Content>
+        {#each savedProfiles as name}
+          <Select.Item value={name} label={name} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
 
     <Input
       value={profileName}
@@ -263,7 +263,7 @@
   </div>
 
   <!-- Right: actions -->
-  <div class="flex items-center gap-1 rounded-lg border border-border bg-background/60 p-1">
+  <div class="flex items-center gap-1 rounded-lg border border-border bg-background/45 backdrop-blur-sm p-1">
     <Button variant="ghost" size="sm" class="h-7 w-7 p-0" aria-label={$t("topbar.newTitle")} title={$t("topbar.newTitle")} onclick={handleNewProfile}>
       <FilePlusIcon class="size-4" />
     </Button>
@@ -286,7 +286,7 @@
 
 {#if showDeleteDialog}
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div role="dialog" aria-modal="true" aria-label={$t("delete.title")} class="rounded-xl border border-border bg-card p-6 shadow-2xl max-w-sm w-full mx-4">
+    <div role="dialog" aria-modal="true" aria-label={$t("delete.title")} class="elevated-panel rounded-xl p-6 max-w-sm w-full mx-4">
       <h2 class="text-lg font-semibold mb-2">{$t("delete.title")}</h2>
       <p class="text-sm text-muted-foreground mb-6">
         {$t("delete.message", { name: profileName.trim() || $t("editor.defaultName") })}

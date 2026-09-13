@@ -6,6 +6,7 @@ const fr = {
   // Home
   "app.checking": "Vérification des prérequis…",
   "home.ready": "Prérequis installés — l'outil est prêt à démarrer.",
+  "home.tagline": "Clavier et souris émulés en manette Xbox 360, avec gyroscope via DSU.",
   "home.configure": "Lancer l'émulation",
   "home.language": "Langue",
   // Prerequisites missing
@@ -35,6 +36,15 @@ const fr = {
   "topbar.profileName": "Nom du profil",
   "topbar.new": "Nouveau",
   "topbar.newTitle": "Nouveau profil",
+  // File picker (in-app open/save dialog)
+  "file.importTitle": "Importer un profil",
+  "file.exportTitle": "Exporter le profil",
+  "file.filename": "Nom du fichier",
+  "file.openBtn": "Ouvrir",
+  "file.saveBtn": "Enregistrer",
+  "file.empty": "Dossier vide",
+  "file.up": "Dossier parent",
+  "file.drives": "Lecteurs",
   // New profile confirmation
   "new.confirmTitle": "Nouveau profil",
   "new.confirmMsg": "Les modifications non sauvegardées de « {name} » seront perdues. Continuer ?",
@@ -162,6 +172,7 @@ export type MessageKey = keyof typeof fr;
 const en: Record<MessageKey, string> = {
   "app.checking": "Checking prerequisites…",
   "home.ready": "Prerequisites installed — the tool is ready to go.",
+  "home.tagline": "Keyboard and mouse emulated as an Xbox 360 pad, with gyroscope over DSU.",
   "home.configure": "Launch emulation",
   "home.language": "Language",
   "prereq.title": "Required driver: ViGEmBus",
@@ -188,6 +199,14 @@ const en: Record<MessageKey, string> = {
   "topbar.profileName": "Profile name",
   "topbar.new": "New",
   "topbar.newTitle": "New profile",
+  "file.importTitle": "Import a profile",
+  "file.exportTitle": "Export profile",
+  "file.filename": "File name",
+  "file.openBtn": "Open",
+  "file.saveBtn": "Save",
+  "file.empty": "Empty folder",
+  "file.up": "Parent folder",
+  "file.drives": "Drives",
   "new.confirmTitle": "New profile",
   "new.confirmMsg": 'Unsaved changes to "{name}" will be lost. Continue?',
   "new.create": "Create",

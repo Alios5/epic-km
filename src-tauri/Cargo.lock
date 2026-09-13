@@ -895,7 +895,7 @@ dependencies = [
 
 [[package]]
 name = "epic-mouse"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "input-engine",
  "serde",
@@ -1742,7 +1742,7 @@ dependencies = [
 
 [[package]]
 name = "input-engine"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "evdev",
  "libc",

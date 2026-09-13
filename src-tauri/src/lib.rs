@@ -114,6 +114,93 @@ fn delete_profile(app: tauri::AppHandle, name: String) -> Result<(), String> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Filesystem browsing for the in-app file picker
+//
+// The app renders its own open/save dialogs instead of the OS-native ones,
+// so the frontend needs a way to walk directories. `DirEntry.path` carries
+// the absolute path so the frontend never has to join path segments itself.
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct DirEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+}
+
+/// List a directory's contents: directories first, then files, each group
+/// sorted alphabetically (case-insensitive).
+#[tauri::command]
+fn list_dir(path: String) -> Result<Vec<DirEntry>, String> {
+    let mut dirs = Vec::new();
+    let mut files = Vec::new();
+    for entry in fs::read_dir(&path)
+        .map_err(|e| format!("Failed to read directory '{}': {}", path, e))?
+        .flatten()
+    {
+        let item = DirEntry {
+            name: entry.file_name().to_string_lossy().to_string(),
+            path: entry.path().to_string_lossy().to_string(),
+            is_dir: entry.file_type().map(|t| t.is_dir()).unwrap_or(false),
+        };
+        if item.is_dir {
+            dirs.push(item);
+        } else {
+            files.push(item);
+        }
+    }
+    let by_name = |a: &DirEntry, b: &DirEntry| a.name.to_lowercase().cmp(&b.name.to_lowercase());
+    dirs.sort_by(by_name);
+    files.sort_by(by_name);
+    dirs.extend(files);
+    Ok(dirs)
+}
+
+#[tauri::command]
+fn parent_dir(path: String) -> Option<String> {
+    std::path::Path::new(&path)
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+/// Filesystem roots offered when the picker reaches a drive root — on
+/// Windows, every drive letter that exists; elsewhere, just `/`.
+#[tauri::command]
+fn list_roots() -> Vec<DirEntry> {
+    #[cfg(target_os = "windows")]
+    {
+        ('A'..='Z')
+            .map(|c| format!("{}:\\", c))
+            .filter(|p| std::path::Path::new(p).exists())
+            .map(|p| DirEntry {
+                name: p.trim_end_matches('\\').to_string(),
+                path: p,
+                is_dir: true,
+            })
+            .collect()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        vec![DirEntry {
+            name: "/".to_string(),
+            path: "/".to_string(),
+            is_dir: true,
+        }]
+    }
+}
+
+/// Starting location for the in-app file picker (Documents, else home).
+#[tauri::command]
+fn default_dir(app: tauri::AppHandle) -> String {
+    app.path()
+        .document_dir()
+        .ok()
+        .or_else(|| app.path().home_dir().ok())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
 /// Export the given profile data to an arbitrary file path (user-chosen via
 /// a save dialog on the frontend).
 #[tauri::command]
@@ -368,7 +455,11 @@ pub fn run() {
             list_profiles,
             delete_profile,
             export_profile,
-            import_profile
+            import_profile,
+            list_dir,
+            parent_dir,
+            list_roots,
+            default_dir
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

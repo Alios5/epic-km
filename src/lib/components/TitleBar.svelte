@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { listen } from "@tauri-apps/api/event";
-  import { confirm } from "@tauri-apps/plugin-dialog";
+  import { confirmDialog } from "$lib/stores/dialogs";
   import { hasUnsavedChanges, activeProfileName } from "$lib/stores/profile";
   import { saveProfile } from "$lib/stores/profileStorage";
   import { t } from "$lib/stores/i18n";
@@ -32,15 +32,13 @@
     const dirty = get(hasUnsavedChanges);
 
     if (dirty) {
-      const shouldSave = await confirm(
-        $t("close.unsavedMsg"),
-        {
-          title: $t("close.unsavedTitle"),
-          kind: "warning",
-          okLabel: $t("close.saveAndClose"),
-          cancelLabel: $t("close.closeWithoutSaving"),
-        }
-      );
+      const shouldSave = await confirmDialog({
+        title: $t("close.unsavedTitle"),
+        message: $t("close.unsavedMsg"),
+        kind: "warning",
+        okLabel: $t("close.saveAndClose"),
+        cancelLabel: $t("close.closeWithoutSaving"),
+      });
 
       if (shouldSave) {
         const name = get(activeProfileName) || $t("editor.defaultName");
@@ -52,8 +50,9 @@
         }
       }
     } else {
-      const confirmed = await confirm($t("close.confirmMsg"), {
+      const confirmed = await confirmDialog({
         title: $t("close.confirmTitle"),
+        message: $t("close.confirmMsg"),
         kind: "warning",
         okLabel: $t("common.close"),
         cancelLabel: $t("common.cancel"),

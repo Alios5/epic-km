@@ -52,17 +52,17 @@
 
   <div class="flex flex-1 min-h-0 overflow-hidden gap-2.5 p-2.5">
     <!-- Left panel: LB/LT/Back, left stick, D-Pad -->
-    <div class="w-72 shrink-0 rounded-xl border border-border/12 bg-card/60 shadow-sm overflow-y-auto overscroll-none">
+    <div class="glass-panel w-72 shrink-0 rounded-xl overflow-y-auto overscroll-none">
       <LeftPanel />
     </div>
 
     <!-- Center: gamepad diagram (visual only) -->
-    <div class="flex-1 flex items-center justify-center overflow-hidden rounded-xl border border-border/10 bg-card/30 shadow-sm">
+    <div class="glass-panel flex-1 flex items-center justify-center overflow-hidden rounded-xl">
       <GamepadDiagram />
     </div>
 
     <!-- Right panel: RB/RT/Start, ABXY, right stick -->
-    <div class="w-72 shrink-0 rounded-xl border border-border/12 bg-card/60 shadow-sm overflow-y-auto overscroll-none">
+    <div class="glass-panel w-72 shrink-0 rounded-xl overflow-y-auto overscroll-none">
       <RightPanel />
     </div>
   </div>
@@ -71,10 +71,10 @@
 
   {#if saveStatus !== "idle"}
     <div
-      class="fixed bottom-14 left-1/2 -translate-x-1/2 z-50 rounded-md border px-4 py-2 text-sm shadow-lg transition-opacity
-      {saveStatus === "success" ? 'border-border bg-card text-foreground' : ''}
-      {saveStatus === "error" ? 'border-destructive/50 bg-destructive/10 text-destructive' : ''}
-      {saveStatus === "saving" ? 'border-border bg-card text-muted-foreground' : ''}"
+      class="fixed bottom-14 left-1/2 -translate-x-1/2 z-50 rounded-md px-4 py-2 text-sm transition-opacity
+      {saveStatus === "success" ? 'elevated-panel text-foreground' : ''}
+      {saveStatus === "error" ? 'border border-destructive/50 bg-destructive/10 text-destructive shadow-lg' : ''}
+      {saveStatus === "saving" ? 'elevated-panel text-muted-foreground' : ''}"
     >
       {saveStatus === "saving" ? $t("editor.saving") : saveMessage}
     </div>

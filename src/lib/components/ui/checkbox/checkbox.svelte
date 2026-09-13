@@ -16,7 +16,7 @@
 	bind:checked
 	data-slot="checkbox"
 	class={cn(
-		"peer size-5 shrink-0 rounded-[var(--radius-field,4px)] border-2 border-base-content/40 bg-transparent transition-colors outline-none",
+		"peer size-5 shrink-0 rounded-[var(--radius-field,4px)] border-2 border-base-content/40 bg-background/40 backdrop-blur-sm transition-colors outline-none",
 		"hover:border-primary focus-visible:ring-2 focus-visible:ring-primary/50",
 		"data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-content",
 		"flex items-center justify-center cursor-pointer data-disabled:cursor-not-allowed data-disabled:opacity-50",
