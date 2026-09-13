@@ -187,6 +187,7 @@ fn show_cursor(show: bool) -> Result<(), String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
+        let _ = show;
         Ok(())
     }
 }

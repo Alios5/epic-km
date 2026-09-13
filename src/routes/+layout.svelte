@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { getVersion } from "@tauri-apps/api/app";
   import TitleBar from "$lib/components/TitleBar.svelte";
+  import ResizeHandles from "$lib/components/ResizeHandles.svelte";
   let { children } = $props();
 
   let version = $state("");
@@ -12,6 +13,7 @@
 </script>
 
 <div class="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+  <ResizeHandles />
   <TitleBar />
   <div class="flex-1 min-h-0 overflow-hidden">
     {@render children?.()}

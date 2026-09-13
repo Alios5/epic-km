@@ -1745,6 +1745,7 @@ name = "input-engine"
 version = "0.2.3"
 dependencies = [
  "evdev",
+ "libc",
  "log",
  "parking_lot",
  "serde",
