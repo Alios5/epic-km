@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Epic KM ${{ github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          releaseBody: |
+            ## What's new in ${{ github.ref_name }}
+
+            - **Linux support** — the input engine now runs natively on Linux (uinput virtual gamepad + evdev capture). Windows support unchanged.
+            - **New "glass" theme** — frosted panels, gradient borders (light top edge / dark bottom edge) and translucent controls across the whole UI, inspired by the Selenite design system.
+            - **In-app dialogs** — file open/save and confirmations are now themed modals rendered inside the app instead of OS-native dialogs.
+            - **Redesigned home screen** — left-aligned layout with the controller artwork faded into the background.
+            - Profile picker is now a themed dropdown; top-bar icons switched to the Solar set.
+
+            ### Downloads
+            - **Windows**: `.msi` installer or NSIS `.exe`
+            - **Linux**: `.AppImage` / `.deb` (requires `/dev/uinput` access)
