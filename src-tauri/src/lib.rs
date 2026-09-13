@@ -187,6 +187,7 @@ fn show_cursor(show: bool) -> Result<(), String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
+        let _ = show;
         Ok(())
     }
 }
@@ -217,7 +218,18 @@ fn check_vigembus() -> String {
             "not-responding".to_string()
         }
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        // Linux has no ViGEmBus; the virtual gamepad is created via the
+        // kernel uinput module instead. Reuse the same status vocabulary:
+        // "not-installed" means /dev/uinput is missing/inaccessible.
+        if input_engine::engine::vigem_available() {
+            "ok".to_string()
+        } else {
+            "not-installed".to_string()
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         "not-installed".to_string()
     }

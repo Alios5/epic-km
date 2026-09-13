@@ -71,8 +71,12 @@ fn init_watcher_inner(profile: Profile, _lock: parking_lot::MutexGuard<'_, ()>) 
         ENGINE = Some(state.clone());
 
         // Start capture thread (raw input + hotkey + message loop)
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         {
+            // Safety net: restore default system cursors in case a previous
+            // run crashed while capture mode had replaced them with blanks.
+            #[cfg(target_os = "windows")]
+            win_capture::show_system_cursor();
             let state_clone = ENGINE.clone().unwrap();
             let handle = thread::spawn(move || {
                 capture_thread(state_clone);
@@ -120,10 +124,12 @@ pub fn shutdown_watcher() {
             // Stop capture thread
             #[cfg(target_os = "windows")]
             win_capture::stop_capture();
+            #[cfg(target_os = "linux")]
+            linux_capture::stop_capture();
         }
 
         // Wait for capture thread to fully terminate
-        #[cfg(target_os = "windows")]
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
         if let Some(handle) = CAPTURE_THREAD.take() {
             drop(lock);
             let _ = handle.join();
@@ -146,6 +152,8 @@ pub fn reload_profile(profile: Profile) -> Result<(), String> {
             // re-register in case the toggle key changed.
             #[cfg(target_os = "windows")]
             win_capture::post_reregister_message();
+            #[cfg(target_os = "linux")]
+            linux_capture::post_reregister_message();
             Ok(())
         } else {
             Err("Watcher is not running".to_string())
@@ -159,12 +167,16 @@ pub fn reload_profile(profile: Profile) -> Result<(), String> {
 pub fn suspend_hotkey() {
     #[cfg(target_os = "windows")]
     win_capture::post_hotkey_off_message();
+    #[cfg(target_os = "linux")]
+    linux_capture::post_hotkey_off_message();
 }
 
 /// Re-register the global capture hotkey from the current profile.
 pub fn resume_hotkey() {
     #[cfg(target_os = "windows")]
     win_capture::post_reregister_message();
+    #[cfg(target_os = "linux")]
+    linux_capture::post_reregister_message();
 }
 
 /// Check if the engine is running.
@@ -199,6 +211,8 @@ pub fn set_log_callback(callback: LogCallback) {
 pub fn toggle_capture_mode() {
     #[cfg(target_os = "windows")]
     win_capture::post_toggle_message();
+    #[cfg(target_os = "linux")]
+    linux_capture::post_toggle_message();
 }
 
 /// Log a message to stdout and forward it to the UI log callback (if any).
@@ -223,7 +237,17 @@ pub fn vigem_available() -> bool {
     {
         vigem_client::Client::connect().is_ok()
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        // Functional check: /dev/uinput must exist AND be writable by the
+        // current user (module loaded + permissions/udev rule in place).
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/uinput")
+            .is_ok()
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     {
         false
     }
@@ -415,20 +439,67 @@ fn emission_thread(state: Arc<EngineState>) {
         elog(&state, "Emission thread stopped");
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     {
+        use crate::linux_gamepad::LinuxGamepad;
+
+        let mut gamepad = match LinuxGamepad::new() {
+            Ok(g) => g,
+            Err(e) => {
+                elog(&state, &format!("Failed to create uinput virtual gamepad: {}", e));
+                state.running.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        elog(&state, "Emission thread started — uinput gamepad created");
+
         while state.running.load(Ordering::SeqCst) {
             let hz = {
                 let p = state.profile.lock();
                 p.right_stick.refresh_interval.max(1)
             };
-            let interval_us = 1_000_000 / hz as u64;
-            thread::sleep(Duration::from_micros(interval_us));
+            let period = Duration::from_secs_f64(1.0 / hz as f64);
+            let tick_start = std::time::Instant::now();
+
+            let capture_active = state.capture_mode_active.load(Ordering::SeqCst);
+            let gamepad_state = {
+                let mut raw = state.raw_input.lock();
+                let profile = state.profile.lock();
+                if capture_active {
+                    map_input(&mut raw, &profile)
+                } else {
+                    raw.mouse_dx = 0;
+                    raw.mouse_dy = 0;
+                    GamepadState::default()
+                }
+            };
+            *state.gamepad.lock() = gamepad_state;
+
+            if let Err(e) = gamepad.update(&gamepad_state) {
+                eprintln!("[input-engine] uinput update error: {}", e);
+            }
+
+            let elapsed = tick_start.elapsed();
+            if elapsed < period {
+                thread::sleep(period - elapsed);
+            }
         }
+
+        elog(&state, "Emission thread stopped");
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        elog(&state, "Virtual gamepad output is not supported on this platform");
+        state.running.store(false, Ordering::SeqCst);
     }
 }
 
 // ---- Platform-specific capture integration ----
+
+#[cfg(target_os = "linux")]
+mod linux_capture;
 
 #[cfg(target_os = "windows")]
 mod win_capture {
@@ -448,11 +519,16 @@ mod win_capture {
         RI_MOUSE_LEFT_BUTTON_DOWN, RI_MOUSE_LEFT_BUTTON_UP,
         RI_MOUSE_RIGHT_BUTTON_DOWN, RI_MOUSE_RIGHT_BUTTON_UP,
         RI_MOUSE_MIDDLE_BUTTON_DOWN, RI_MOUSE_MIDDLE_BUTTON_UP,
-        WM_HOTKEY, WM_APP, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+        WM_HOTKEY, WM_APP, WM_KEYDOWN, WM_SYSKEYDOWN,
         SetWindowsHookExW, UnhookWindowsHookEx, CallNextHookEx,
         HHOOK, KBDLLHOOKSTRUCT, WH_KEYBOARD_LL, HC_ACTION, LLKHF_EXTENDED,
         ShowCursor, ClipCursor, GetSystemMetrics, SetCursorPos,
         SM_CXSCREEN, SM_CYSCREEN,
+        CreateCursor, SetSystemCursor, SystemParametersInfoW,
+        SPI_SETCURSORS, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SYSTEM_CURSOR_ID,
+        OCR_NORMAL, OCR_IBEAM, OCR_WAIT, OCR_CROSS, OCR_UP,
+        OCR_SIZENWSE, OCR_SIZENESW, OCR_SIZEWE, OCR_SIZENS,
+        OCR_SIZEALL, OCR_NO, OCR_HAND, OCR_APPSTARTING,
         GetForegroundWindow, GetWindowThreadProcessId,
     };
     use windows::Win32::System::Threading::{GetCurrentProcessId, GetCurrentThreadId};
@@ -607,6 +683,61 @@ mod win_capture {
         unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
     }
 
+    /// Standard system cursor IDs we replace with a blank cursor while
+    /// capture mode is active.
+    const SYSTEM_CURSOR_IDS: [SYSTEM_CURSOR_ID; 13] = [
+        OCR_NORMAL, OCR_IBEAM, OCR_WAIT, OCR_CROSS, OCR_UP,
+        OCR_SIZENWSE, OCR_SIZENESW, OCR_SIZEWE, OCR_SIZENS,
+        OCR_SIZEALL, OCR_NO, OCR_HAND, OCR_APPSTARTING,
+    ];
+
+    /// Replace every standard system cursor with a fully transparent one.
+    ///
+    /// `ShowCursor(false)` alone does NOT hide the pointer globally: the
+    /// internal display counter only applies while the mouse hovers a window
+    /// owned by the calling thread. This capture thread owns nothing but a
+    /// message-only window, so over any other app's window (the game, the
+    /// desktop…) the cursor stays visible. `SetSystemCursor` instead patches
+    /// the shared system cursor resources — the pointer becomes invisible
+    /// everywhere, which is what remapping tools (mouse2joystick, reWASD)
+    /// rely on. Restored by `show_system_cursor`.
+    fn hide_system_cursor() {
+        // 32x32 monochrome cursor: AND plane all-1 + XOR plane all-0 makes
+        // every pixel transparent.
+        let and_mask = [0xFFu8; 128];
+        let xor_mask = [0x00u8; 128];
+        unsafe {
+            for id in SYSTEM_CURSOR_IDS {
+                // SetSystemCursor destroys the passed cursor handle itself, so a
+                // fresh blank cursor must be created for every ID.
+                if let Ok(blank) = CreateCursor(
+                    None,
+                    0,
+                    0,
+                    32,
+                    32,
+                    and_mask.as_ptr() as *const _,
+                    xor_mask.as_ptr() as *const _,
+                ) {
+                    let _ = SetSystemCursor(blank, id);
+                }
+            }
+        }
+    }
+
+    /// Restore the default system cursors replaced by `hide_system_cursor`.
+    /// `SPI_SETCURSORS` reloads all of them from the user's theme.
+    pub fn show_system_cursor() {
+        unsafe {
+            let _ = SystemParametersInfoW(
+                SPI_SETCURSORS,
+                0,
+                None,
+                SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+            );
+        }
+    }
+
     /// Activate capture mode: hide cursor, clip cursor, install keyboard hook.
     pub fn activate_capture_mode() {
         unsafe {
@@ -617,6 +748,7 @@ mod win_capture {
                 .unwrap_or(true);
             if hide_cursor {
                 while ShowCursor(false) >= 0 {}
+                hide_system_cursor();
             }
 
             // Clip cursor to center point (1x1 pixel rect)
@@ -668,8 +800,11 @@ mod win_capture {
             // Unclip cursor
             let _ = ClipCursor(None);
 
-            // Show cursor
+            // Show cursor (always restore the system cursors: the profile
+            // flag may have changed since activation, and leaving a blank
+            // cursor behind would keep the pointer invisible forever).
             while ShowCursor(true) < 0 {}
+            show_system_cursor();
         }
     }
 
@@ -1043,7 +1178,12 @@ fn capture_thread(state: Arc<EngineState>) {
     win_capture::capture_thread(state);
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
+fn capture_thread(state: Arc<EngineState>) {
+    linux_capture::capture_thread(state);
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn capture_thread(_state: Arc<EngineState>) {
-    // No-op on non-Windows
+    // No-op on unsupported platforms
 }
