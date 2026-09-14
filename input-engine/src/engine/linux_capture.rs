@@ -18,8 +18,11 @@ use super::*;
 use crate::keycode::{code_to_scancode, is_mouse_code};
 use evdev::uinput::{VirtualDevice, VirtualDeviceBuilder};
 use evdev::{AttributeSet, Device, EventType, InputEvent, Key, RelativeAxisType};
+use std::collections::HashSet;
 use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering as AtomicOrdering;
+use std::time::{Duration, Instant};
 use x11rb::connection::Connection;
 use x11rb::protocol::xfixes;
 use x11rb::rust_connection::RustConnection;
@@ -153,8 +156,69 @@ fn evdev_to_id(code: u16) -> u16 {
 
 struct MonitoredDevice {
     dev: Device,
+    path: PathBuf,
     is_pointer: bool,
     dead: bool,
+}
+
+/// (Re)scan `/dev/input` and start monitoring every keyboard/pointer device
+/// not already tracked. Called once at startup and then periodically so
+/// hot-plugged devices — Bluetooth keyboards pairing on first keypress, USB
+/// receivers re-enumerating after power saving — get picked up without
+/// restarting the engine. Returns how many devices were added.
+fn scan_devices(
+    devices: &mut Vec<MonitoredDevice>,
+    monitored: &mut HashSet<PathBuf>,
+    grabbed: bool,
+) -> usize {
+    let mut added = 0;
+    for (path, mut dev) in evdev::enumerate() {
+        if monitored.contains(&path) {
+            continue;
+        }
+        if let Some(name) = dev.name() {
+            if name.starts_with("Epic KM") {
+                // Our own uinput devices (gamepad, key forwarder): skip but
+                // remember so they are not re-opened on every rescan.
+                monitored.insert(path);
+                continue;
+            }
+        }
+        // Monitor every device that reports keys or pointer motion —
+        // secondary key devices (media keys, macro pads) may carry the
+        // toggle key even without a full alphanumeric set.
+        let has_keys = dev
+            .supported_keys()
+            .map_or(false, |k| k.iter().next().is_some());
+        let is_pointer = dev.supported_relative_axes().map_or(false, |a| {
+            a.contains(RelativeAxisType::REL_X) && a.contains(RelativeAxisType::REL_Y)
+        });
+        if !has_keys && !is_pointer {
+            continue;
+        }
+        unsafe {
+            libc::fcntl(dev.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK);
+        }
+        // If capture is already active, grab the newcomer immediately so it
+        // cannot bypass capture mode.
+        if grabbed {
+            let _ = dev.grab();
+        }
+        log(&format!(
+            "Monitoring {} ({})",
+            path.display(),
+            dev.name().unwrap_or("unnamed")
+        ));
+        monitored.insert(path.clone());
+        devices.push(MonitoredDevice {
+            dev,
+            path,
+            is_pointer,
+            dead: false,
+        });
+        added += 1;
+    }
+    added
 }
 
 /// Log the capture toggle key resolved from the current profile, so the
@@ -329,38 +393,8 @@ pub fn capture_thread(state: Arc<EngineState>) {
     // Discover keyboards and pointer devices. Our own virtual devices are
     // skipped by name so we never read back what the engine emits.
     let mut devices: Vec<MonitoredDevice> = Vec::new();
-    for (path, dev) in evdev::enumerate() {
-        if let Some(name) = dev.name() {
-            if name.starts_with("Epic KM") {
-                continue;
-            }
-        }
-        // Monitor every device that reports keys or pointer motion —
-        // secondary key devices (media keys, macro pads) may carry the
-        // toggle key even without a full alphanumeric set.
-        let has_keys = dev
-            .supported_keys()
-            .map_or(false, |k| k.iter().next().is_some());
-        let is_pointer = dev.supported_relative_axes().map_or(false, |a| {
-            a.contains(RelativeAxisType::REL_X) && a.contains(RelativeAxisType::REL_Y)
-        });
-        if !has_keys && !is_pointer {
-            continue;
-        }
-        unsafe {
-            libc::fcntl(dev.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK);
-        }
-        log(&format!(
-            "Monitoring {} ({})",
-            path.display(),
-            dev.name().unwrap_or("unnamed")
-        ));
-        devices.push(MonitoredDevice {
-            dev,
-            is_pointer,
-            dead: false,
-        });
-    }
+    let mut monitored: HashSet<PathBuf> = HashSet::new();
+    scan_devices(&mut devices, &mut monitored, false);
     if devices.is_empty() {
         log("No readable input devices under /dev/input — add your user to the 'input' group or install a udev uaccess rule");
     }
@@ -373,6 +407,7 @@ pub fn capture_thread(state: Arc<EngineState>) {
 
     let mut grabbed = false;
     let mut forwarder: Option<VirtualDevice> = None;
+    let mut last_scan = Instant::now();
 
     while !STOP.load(AtomicOrdering::SeqCst) && state.running.load(Ordering::SeqCst) {
         // Pending toggle requested from the UI thread.
@@ -384,14 +419,31 @@ pub fn capture_thread(state: Arc<EngineState>) {
             log_toggle_key(&state);
         }
 
+        // Periodic rescan: pick up devices that appeared after startup
+        // (Bluetooth keyboards pairing on first keypress, USB receivers
+        // re-enumerating after power saving). While grabbed, rebuild the
+        // forwarder so a newcomer's unmapped keys get re-emitted too.
+        if last_scan.elapsed() >= Duration::from_secs(2) {
+            last_scan = Instant::now();
+            if scan_devices(&mut devices, &mut monitored, grabbed) > 0 && grabbed {
+                forwarder = build_forwarder(&devices);
+            }
+        }
+
         // Apply grab state transitions.
         let want_grab = state.capture_mode_active.load(Ordering::SeqCst);
         if want_grab != grabbed {
             if want_grab {
                 let mut ok = 0usize;
                 for d in devices.iter_mut().filter(|d| !d.dead) {
-                    if d.dev.grab().is_ok() {
-                        ok += 1;
+                    match d.dev.grab() {
+                        Ok(()) => ok += 1,
+                        Err(e) => log(&format!(
+                            "Could not grab {} ({}): {}",
+                            d.path.display(),
+                            d.dev.name().unwrap_or("unnamed"),
+                            e
+                        )),
                     }
                 }
                 forwarder = build_forwarder(&devices);
@@ -447,6 +499,12 @@ pub fn capture_thread(state: Arc<EngineState>) {
             let d = &mut devices[*idx];
             if pfd.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0 {
                 d.dead = true;
+                monitored.remove(&d.path);
+                log(&format!(
+                    "Input device lost: {} ({})",
+                    d.path.display(),
+                    d.dev.name().unwrap_or("unnamed")
+                ));
                 if grabbed {
                     let _ = d.dev.ungrab();
                 }
